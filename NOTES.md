@@ -38,3 +38,22 @@ o que foi montado.
 Decidi recomeçar do zero em vez de remendar.
 
 O que fica:
+
+- Fragmento endereçado por caminho, uma pasta por namespace, um arquivo por
+  fragmento. Isso funcionou.
+- Variante por ponto (`tom.claude`). Também funcionou.
+- Receita como lista de `[load]` com condição.
+
+O que muda:
+
+- **Motor próprio, não emprestado.** A gramática precisa ser pequena o
+  bastante para eu conseguir dizer o que ela NÃO faz. Conteúdo de fragmento
+  nunca é avaliado.
+- **Identidade em toda montagem.** Se não dá para dizer o que gerou um
+  resultado, o resto não importa.
+- **Colisão é erro, não escolha.** Nunca escolher em silêncio.
+- Separar variável que muda estrutura de variável que muda conteúdo. São
+  coisas diferentes e eu estava tratando como a mesma.
+
+Antes de escrever código dessa vez: pesquisar o que já existe e escrever
+o que estou construindo.

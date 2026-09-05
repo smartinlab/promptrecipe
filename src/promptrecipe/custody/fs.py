@@ -1,0 +1,69 @@
+"""Local filesystem custody adapter.
+
+One fragment is one file (ADR-007). That is not a storage preference:
+per-fragment review is delegated to version control, and bundling fragments
+into one file would make a per-fragment diff impossible.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from promptrecipe.custody import FragmentContent
+from promptrecipe.errors import FragmentNotFound, UnknownNamespace
+from promptrecipe.identity import FragmentId
+from promptrecipe.paths import FragmentPath
+
+
+class FsCustody:
+    """Maps namespaces to filesystem roots."""
+
+    def __init__(self, extension: str = "md") -> None:
+        self._roots: dict[str, Path] = {}
+        self._extension = extension
+
+    def with_namespace(self, namespace: str, root: Path | str) -> FsCustody:
+        self._roots[namespace] = Path(root)
+        return self
+
+    @property
+    def known_namespaces(self) -> list[str]:
+        # Sorted: this list appears in error messages, which must be stable.
+        return sorted(self._roots)
+
+    def _file_for(self, path: FragmentPath) -> Path:
+        root = self._roots.get(path.namespace)
+        if root is None:
+            raise UnknownNamespace(
+                namespace=path.namespace, path=str(path), known=self.known_namespaces
+            )
+        return root.joinpath(*path.segments).with_suffix(f".{self._extension}")
+
+    def exists(self, path: FragmentPath) -> bool:
+        try:
+            return self._file_for(path).is_file()
+        except UnknownNamespace:
+            return False
+
+    def read(self, path: FragmentPath) -> FragmentContent:
+        file = self._file_for(path)
+        if not file.is_file():
+            raise FragmentNotFound(path=str(path), namespaces=self.known_namespaces)
+        return FragmentContent.of(file.read_bytes())
+
+    def list(self, namespace: str) -> list[FragmentPath]:
+        root = self._roots.get(namespace)
+        if root is None:
+            raise UnknownNamespace(namespace=namespace, path=namespace, known=self.known_namespaces)
+        found = [
+            FragmentPath.parse(f"{namespace}/{f.stem}")
+            for f in root.iterdir()
+            if f.is_file() and f.suffix == f".{self._extension}"
+        ]
+        # Directory iteration order is not stable across platforms and must
+        # never reach output (TRD §4). Sort explicitly.
+        return sorted(found)
+
+    def versions(self, path: FragmentPath) -> list[FragmentId]:
+        # The filesystem holds exactly one version: whatever is on disk now.
+        return [self.read(path).id]

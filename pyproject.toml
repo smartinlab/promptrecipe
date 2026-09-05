@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "promptrecipe"
+version = "0.1.0"
+description = "Compose prompts from path-addressed fragments, deterministically and attributably."
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+# Floor is 3.11, not 3.10: Python 3.10 reaches end-of-life in October 2026.
+# Ceiling matches the optimization integration target's own constraint.
+requires-python = ">=3.11,<3.15"
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+# Exactly one runtime dependency. This is a deliberate property, not an accident.
+dependencies = ["blake3==1.0.9"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "hypothesis==6.167.1",
+    "ruff==0.16.5",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/promptrecipe"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

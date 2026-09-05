@@ -1,0 +1,18 @@
+{
+  "cycle_id": "promptrecipe-2026-09-05",
+  "tasks_file": "docs/pre-dev/promptrecipe/tasks.md",
+  "subtasks_index": "docs/pre-dev/promptrecipe/subtasks.md",
+  "execution_mode": "automatic",
+  "gates_enabled": [0, 3, 4, 5],
+  "gates_skipped": [1, 2],
+  "gates_skipped_reason": "Embedded library: no service to containerize (Gate 1), no observability surface to instrument (Gate 2). PROJECT_RULES prohibits a logging framework as a runtime dependency.",
+  "coverage_enforcement": false,
+  "coverage_reason": "pytest-cov is not pinned in the Dependency Map. User elected to defer coverage tooling rather than add an unpinned dev dependency.",
+  "task_scope": ["T-001","T-002","T-003","T-004","T-005","T-006","T-007","T-008"],
+  "task_scope_reason": "Only tasks with subtask-level decomposition. T-009..T-027 subtasks are deliberately deferred until the codebase exists.",
+  "custom_prompt": null,
+  "status": "running",
+  "started_at": "2026-09-05",
+  "completed_tasks": [],
+  "current_task": "T-001"
+}

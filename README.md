@@ -6,7 +6,7 @@ in what order, and at which version. Composing them produces the final prompt.
 
 ```python
 result = promptrecipe.get_prompt("core/recipe.claude", params, resolver)
-agent = Agent(system_prompt=result.text)     # the caller never sees a fragment
+agent = Agent(system_prompt=result.text)  # the caller never sees a fragment
 ```
 
 **Status: planning complete, implementation not started.**

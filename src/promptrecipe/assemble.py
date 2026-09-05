@@ -14,12 +14,16 @@ fragments load, their order, or their version.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 
+from promptrecipe.custody import FragmentContent
 from promptrecipe.errors import (
     AmbiguousOrder,
+    CyclicInclusion,
     DepthLimitExceeded,
     ExpectationFailed,
+    FragmentDirectiveNotAllowed,
     UndefinedVariable,
     UnknownOrderName,
     UnorderedFragment,
@@ -55,6 +59,14 @@ from promptrecipe.provenance import (
 from promptrecipe.resolve import Resolver
 
 Value = str | int | bool
+
+MAX_INCLUSION_DEPTH = 32
+"""Ceiling on nested fragment inclusion.
+
+Cycle detection catches a fragment that comes back to itself; this catches a
+chain that is merely absurdly long. Both fail loudly rather than exhausting
+the stack.
+"""
 
 MAX_EXPRESSION_DEPTH = 64
 """Ceiling on expression-tree depth during evaluation.
@@ -162,6 +174,31 @@ def _describe(expr: Expr, depth: int = 0) -> str:
     raise AssertionError(f"unreachable: unknown expression node {type(expr).__name__}")
 
 
+REFERENCE = re.compile(r"\[\s*load\s+([A-Za-z_][\w.-]*(?:/[\w.-]+)+)\s*\]")
+"""A fragment's reference to a sibling: `[load namespace/path]`.
+
+The path must be QUALIFIED — it must contain a separator. A bare identifier
+would be an address variable, and honouring one inside fragment text would
+let untrusted content read from the caller's address space.
+
+Recognising this one fixed form is not evaluating the fragment: there is no
+expression to evaluate and no branch to take. The fragment can name a
+sibling and nothing else (ADR-003, E1).
+"""
+
+DIRECTIVE_IN_FRAGMENT = re.compile(r"\[\s*(load|if|order|expect)\b")
+"""Any directive keyword appearing in fragment text.
+
+A fragment may reference; it may not branch, order, or assert. Text like
+`[if x] [load y]` is rejected rather than treated as literal-prose-plus-load:
+the load would happen unconditionally while looking conditional, which is
+precisely the silently-wrong output this codebase refuses everywhere else.
+
+Ordinary bracketed prose — `[1]`, `[TODO]`, `[see appendix]` — is untouched,
+because only these four keywords are directives.
+"""
+
+
 def slot_of(path: FragmentPath) -> str:
     """The ORDER SLOT a fragment fills.
 
@@ -214,6 +251,64 @@ def _substitute(text: str, values: dict[str, str]) -> str:
             out.append(text[start : end + 2])
         i = end + 2
 
+    return "".join(out)
+
+
+def _expand(
+    path: FragmentPath,
+    content: FragmentContent,
+    resolver: Resolver,
+    stack: list[str],
+    seen: list[tuple[str, FragmentId]],
+) -> str:
+    """Inline a fragment, resolving any references it makes to other fragments.
+
+    Depth-first over an explicit stack so a cycle can be reported as the
+    ACTUAL PATH that closed it — `a -> b -> c -> a` — rather than merely
+    "a cycle exists". Gate 0 found build systems that only report the latter,
+    and one that silently drops the cycle and continues; the second is the
+    behaviour this product exists to make impossible.
+    """
+    if len(stack) > MAX_INCLUSION_DEPTH:
+        raise DepthLimitExceeded(limit=MAX_INCLUSION_DEPTH, path=str(path))
+
+    out: list[str] = []
+    cursor = 0
+    text = content.text
+
+    # Reject directive-shaped text that is not a plain qualified reference,
+    # before inlining anything.
+    references = list(REFERENCE.finditer(text))
+    allowed = {(m.start(), m.end()) for m in references}
+    for found in DIRECTIVE_IN_FRAGMENT.finditer(text):
+        if not any(start <= found.start() < end for start, end in allowed):
+            raise FragmentDirectiveNotAllowed(
+                path=str(path),
+                directive=found.group(1),
+                excerpt=text[found.start() : found.start() + 40],
+            )
+
+    for match in references:
+        out.append(text[cursor : match.start()])
+        child_path = FragmentPath.parse(match.group(1))
+        key = str(child_path)
+
+        if key in stack:
+            # The cycle is the portion of the stack from the first visit
+            # onward, closed by the repeat.
+            start = stack.index(key)
+            raise CyclicInclusion(cycle=[*stack[start:], key])
+
+        child_content, _trace = resolver.fetch(child_path)
+        seen.append((key, child_content.id))
+        stack.append(key)
+        try:
+            out.append(_expand(child_path, child_content, resolver, stack, seen))
+        finally:
+            stack.pop()
+        cursor = match.end()
+
+    out.append(text[cursor:])
     return "".join(out)
 
 
@@ -311,8 +406,13 @@ def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
             parts.append(payload)
         else:
             path, content = payload
-            parts.append(content.text)
+            nested: list[tuple[str, FragmentId]] = []
+            parts.append(_expand(path, content, resolver, [str(path)], nested))
             fragments.append((str(path), content.id))
+            # Nested fragments are dependencies too: provenance must name every
+            # fragment that reached the output, not only the ones the recipe
+            # mentioned directly (SD13, FR-002).
+            fragments.extend(nested)
 
     # --- 6. value substitution — LAST, single pass, never re-parsed --------
     #

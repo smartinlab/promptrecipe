@@ -190,3 +190,29 @@ class UndecodableFragment(PromptRecipeError):
 
     def __str__(self) -> str:
         return f"fragment {self.identity} is not valid UTF-8: {self.reason}"
+
+
+@dataclass(slots=True)
+class FragmentDirectiveNotAllowed(PromptRecipeError):
+    """Fragment text contains a directive other than a qualified reference.
+
+    A fragment may name a sibling with `[load namespace/path]`. It may not
+    branch, order, or assert — those decide STRUCTURE, and fragment content is
+    untrusted (it may be optimizer-written or remotely fetched).
+
+    Rejected rather than left literal: `[if x] [load y]` would otherwise load
+    unconditionally while looking conditional, which is the silently-wrong
+    output this library refuses everywhere else.
+    """
+
+    path: str
+    directive: str
+    excerpt: str = ""
+
+    def __str__(self) -> str:
+        return (
+            f"fragment '{self.path}' contains a '[{self.directive} ...]' directive "
+            f"near {self.excerpt!r}. A fragment may reference a sibling with "
+            "[load namespace/path] and nothing else — conditions, ordering and "
+            "expectations belong in the recipe, not in fragment content."
+        )

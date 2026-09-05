@@ -12,7 +12,6 @@ from promptrecipe.custody import FragmentContent
 from promptrecipe.custody.fs import FsCustody
 from promptrecipe.errors import (
     DepthLimitExceeded,
-    OrderNotImplemented,
     PathEscapesNamespace,
     PromptRecipeError,
     UndecodableFragment,
@@ -86,17 +85,6 @@ def test_both_conditions_are_recorded_in_provenance():
     r = resolver({"core/r": "[if a][if b] [load core/x]", "core/x": "BODY"})
     out = get_prompt("core/r", Params(controls={"a": True, "b": True}), r)
     assert len(out.attestation.condition_outcomes) == 2
-
-
-# --- [order] parsed but never applied ---
-
-
-def test_an_order_directive_fails_loudly_instead_of_being_ignored():
-    """Silently dropping it would produce a prompt whose sequence contradicts
-    the recipe — and order is part of identity (SD13)."""
-    with pytest.raises(OrderNotImplemented) as exc:
-        assemble(parse("[order: role, tone]"), Params(), resolver())
-    assert "T-011" in str(exc.value)
 
 
 # --- symlink escape: lexical canonicalization cannot see a symlink ---

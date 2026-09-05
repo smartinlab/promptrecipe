@@ -17,10 +17,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from promptrecipe.errors import (
+    AmbiguousOrder,
     DepthLimitExceeded,
     ExpectationFailed,
-    OrderNotImplemented,
     UndefinedVariable,
+    UnknownOrderName,
+    UnorderedFragment,
 )
 from promptrecipe.identity import FragmentId
 from promptrecipe.parser.nodes import (
@@ -160,6 +162,18 @@ def _describe(expr: Expr, depth: int = 0) -> str:
     raise AssertionError(f"unreachable: unknown expression node {type(expr).__name__}")
 
 
+def slot_of(path: FragmentPath) -> str:
+    """The ORDER SLOT a fragment fills.
+
+    A slot is the leaf name up to its first dot, so `core/tone.claude` and
+    `core/tone.gpt` both fill the slot `tone`. That is what lets an order
+    declaration describe STRUCTURE while a condition chooses the VARIANT —
+    the split amendment 6's model-portability use case depends on.
+    """
+    leaf = path.segments[-1] if path.segments else path.namespace
+    return leaf.split(".", 1)[0]
+
+
 def _path_for(path: PathExpr, params: Params) -> FragmentPath:
     if isinstance(path, PathLiteral):
         return FragmentPath.parse(path.value)
@@ -203,6 +217,47 @@ def _substitute(text: str, values: dict[str, str]) -> str:
     return "".join(out)
 
 
+def _apply_order(
+    segments: list[tuple[str, object]], declared: list[Order]
+) -> list[tuple[str, object]]:
+    """Permute fragment segments into a declared slot order.
+
+    Prose keeps its position; only the fragment contents move between the
+    positions where loads occurred. That keeps a reordering predictable — the
+    shape of the recipe is unchanged, the sequence of its parts is not.
+    """
+    if not declared:
+        return segments
+    if len(declared) > 1:
+        # Two reachable order declarations mean the recipe does not say what
+        # the order is. Picking one would be the silent-shadowing failure in
+        # a different costume.
+        raise AmbiguousOrder(declarations=[list(d.names) for d in declared])
+
+    wanted = declared[0].names
+    positions = [i for i, (kind, _) in enumerate(segments) if kind == "frag"]
+    loaded = [segments[i][1] for i in positions]
+
+    by_slot: dict[str, list[object]] = {}
+    for item in loaded:
+        by_slot.setdefault(slot_of(item[0]), []).append(item)
+
+    ordered: list[object] = []
+    for name in wanted:
+        if name not in by_slot:
+            raise UnknownOrderName(name=name, available=sorted(by_slot))
+        ordered.extend(by_slot.pop(name))
+
+    if by_slot:
+        # A loaded fragment the order never mentions has no defined position.
+        raise UnorderedFragment(slots=sorted(by_slot))
+
+    reordered = list(segments)
+    for position, item in zip(positions, ordered, strict=True):
+        reordered[position] = ("frag", item)
+    return reordered
+
+
 def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
     """Assemble a recipe. Pure over what the resolver returns."""
     # --- 1. expectations, before any content exists (TRD §7) ---------------
@@ -214,9 +269,11 @@ def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
                 actual=f"controls were {dict(sorted(params.controls.items()))}",
             )
 
-    parts: list[str] = []
-    fragments: list[tuple[str, FragmentId]] = []
+    # Segments are (kind, payload). Fragment segments stay addressable so a
+    # declared order can permute them while prose keeps its position.
+    segments: list[tuple[str, object]] = []
     condition_outcomes: list[tuple[str, bool]] = []
+    declared_orders: list[Order] = []
 
     def emit(stmt: Stmt) -> None:
         if isinstance(stmt, If):
@@ -227,25 +284,35 @@ def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
             if outcome:
                 emit(stmt.body)
         elif isinstance(stmt, Order):
-            # Parsed since T-003 but never applied. Ordering is T-011 (Phase 2).
-            # Failing loudly is the only honest option: silently ignoring a
-            # declared order would produce a prompt whose fragment sequence
-            # contradicts the recipe, and order is part of identity (SD13).
-            raise OrderNotImplemented(names=list(stmt.names), position=stmt.position)
+            # Collected, not applied here: an order declaration inside a
+            # satisfied condition is how ordering becomes parameterizable,
+            # reusing the condition mechanism rather than inventing a second
+            # one (the same reasoning as amendment 3 for version selection).
+            declared_orders.append(stmt)
         elif isinstance(stmt, Text):
-            parts.append(stmt.value)
+            segments.append(("text", stmt.value))
         elif isinstance(stmt, Load):
             path = _path_for(stmt.path, params)
             # One fetch: resolve and read were two independent lookups, which
             # meant two I/O round-trips per fragment and — worse — two code
             # paths that could disagree about ambiguity.
             content, _trace = resolver.fetch(path)
-            parts.append(content.text)
-            fragments.append((str(path), content.id))
-        # Order and Expect produce no content here.
+            segments.append(("frag", (path, content)))
 
     for stmt in recipe.statements:
         emit(stmt)
+
+    segments = _apply_order(segments, declared_orders)
+
+    parts: list[str] = []
+    fragments: list[tuple[str, FragmentId]] = []
+    for kind, payload in segments:
+        if kind == "text":
+            parts.append(payload)
+        else:
+            path, content = payload
+            parts.append(content.text)
+            fragments.append((str(path), content.id))
 
     # --- 6. value substitution — LAST, single pass, never re-parsed --------
     #

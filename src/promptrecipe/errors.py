@@ -132,24 +132,48 @@ class UndefinedVariable(PromptRecipeError):
 
 
 @dataclass(slots=True)
-class OrderNotImplemented(PromptRecipeError):
-    """`[order: ...]` parses but is not applied yet (T-011, Phase 2).
+class AmbiguousOrder(PromptRecipeError):
+    """More than one order declaration was reachable in one assembly."""
 
-    Raised rather than ignored: a silently-dropped order directive produces a
-    prompt whose fragment sequence contradicts the recipe, and order is part
-    of assembly identity (SD13) — so ignoring it would corrupt comparison too.
-    """
-
-    names: list[str] = field(default_factory=list)
-    position: Position | None = None
+    declarations: list[list[str]] = field(default_factory=list)
 
     def __str__(self) -> str:
-        where = f" at {self.position}" if self.position else ""
-        listed = ", ".join(self.names)
+        listed = " | ".join(", ".join(d) for d in self.declarations)
         return (
-            f"[order: {listed}]{where} is parsed but not applied yet "
-            "(ordering is planned as task T-011). Remove the directive, or "
-            "declare fragments in the sequence you want them assembled."
+            f"{len(self.declarations)} order declarations are active at once: {listed}. "
+            "The recipe does not say what the order is; gate each declaration so "
+            "exactly one applies."
+        )
+
+
+@dataclass(slots=True)
+class UnknownOrderName(PromptRecipeError):
+    """An order names a slot that no loaded fragment fills."""
+
+    name: str
+    available: list[str] = field(default_factory=list)
+
+    def __str__(self) -> str:
+        listed = ", ".join(self.available) or "<none loaded>"
+        return (
+            f"order names '{self.name}', but no loaded fragment fills that slot "
+            f"(loaded slots: {listed}). A slot is a fragment's leaf name up to "
+            "its first dot, so 'core/tone.claude' fills the slot 'tone'."
+        )
+
+
+@dataclass(slots=True)
+class UnorderedFragment(PromptRecipeError):
+    """A fragment loaded but the declared order never mentions its slot."""
+
+    slots: list[str] = field(default_factory=list)
+
+    def __str__(self) -> str:
+        listed = ", ".join(self.slots)
+        return (
+            f"these slots were loaded but the order does not mention them: {listed}. "
+            "Once an order is declared it must account for every loaded fragment, "
+            "or the unmentioned ones have no defined position."
         )
 
 

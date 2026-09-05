@@ -78,7 +78,23 @@ The concern was that Python would be too slow for the template core. Examining w
 
 **And the decisive context:** this sits on the request path of a model call, which takes 500 ms–30 s. Even a 4 ms assembly is **0.01%–0.8%** of end-to-end latency. Optimizing it is invisible.
 
-> ⚠️ **These are reasoned estimates from known operation costs, not measurements.** No benchmark could be run in this session. **Task T-005 now carries a subtask that measures the assembly path against the §8 budget for real** — so this decision stops resting on my estimate.
+> ### ✅ MEASURED — 2026-09-05, ST-005-06
+>
+> The estimates above were replaced by a real benchmark. 50 fragments, ~50 KB
+> assembled, 200 iterations, CPython 3.12.13 on Apple Silicon:
+>
+> | | p50 | p95 | p99 | max | budget |
+> |---|---|---|---|---|---|
+> | **warm** | **0.715 ms** | 0.803 ms | **0.842 ms** | 1.739 ms | 10 ms |
+> | **cold** | 0.960 ms | — | — | — | 200 ms |
+>
+> **Warm p99 uses 8% of its budget — roughly 12x headroom.** Against a 500 ms
+> model call, assembly is **0.143%** of end-to-end latency.
+>
+> The estimate ("well under 1 ms warm") was accurate. The reversal from a
+> compiled core to pure Python is confirmed by measurement, not argument.
+> `tests/test_performance_budget.py` enforces the budget so a regression —
+> an accidental O(n²), a per-call re-parse — fails the build.
 
 ### The crux: the one genuinely hot operation is already compiled
 

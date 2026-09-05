@@ -370,7 +370,10 @@ def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
     condition_outcomes: list[tuple[str, bool]] = []
     declared_orders: list[Order] = []
 
-    def emit(stmt: Stmt) -> None:
+    def emit(stmt: Stmt) -> bool:
+        """Append a statement's output. Returns True if it produced nothing
+        because a condition was not taken — the caller uses that to suppress
+        the rest of the line."""
         if isinstance(stmt, If):
             # A nested `[if a][if b] x` used to fall through here and vanish
             # with no error — silent wrong output, which PROJECT_RULES forbids.
@@ -378,6 +381,8 @@ def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
             condition_outcomes.append((_describe(stmt.condition), outcome))
             if outcome:
                 emit(stmt.body)
+                return False
+            return True
         elif isinstance(stmt, Order):
             # Collected, not applied here: an order declaration inside a
             # satisfied condition is how ordering becomes parameterizable,
@@ -393,9 +398,34 @@ def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
             # paths that could disagree about ambiguity.
             content, _trace = resolver.fetch(path)
             segments.append(("frag", (path, content)))
+        return False
 
+    # A conditional that is not taken also swallows the remainder of its line.
+    #
+    # Without this, `[if x][load y]` on its own line still emits the newline
+    # that followed it, so a recipe with three unmet conditions produces three
+    # stray blank lines. Found by assembling a realistic library rather than a
+    # unit fixture — the recipes in tests are single-line and never showed it.
+    #
+    # The rule is deliberately narrow: only whitespace up to and including the
+    # FIRST newline is dropped, and only directly after an untaken condition.
+    # A blank line the author wrote as spacing between other statements is
+    # untouched.
+    suppress_line = False
     for stmt in recipe.statements:
-        emit(stmt)
+        if suppress_line and isinstance(stmt, Text):
+            newline = stmt.value.find("\n")
+            head = stmt.value[: newline + 1] if newline != -1 else stmt.value
+            if head.strip():
+                # Real content on the line — the author meant it to stay.
+                suppress_line = False
+            else:
+                remainder = stmt.value[newline + 1 :] if newline != -1 else ""
+                suppress_line = False
+                if remainder:
+                    segments.append(("text", remainder))
+                continue
+        suppress_line = emit(stmt)
 
     segments = _apply_order(segments, declared_orders)
 

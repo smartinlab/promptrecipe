@@ -1,0 +1,7 @@
+[expect tier in ["free", "pro", "enterprise"]]
+[load core/identity]
+[load core/tone.claude]
+[if language == "pt-br"][load policy/pt-br]
+[if tier != "free"][load policy/escalation]
+[if tools_enabled][load tools/search]
+[load core/safety]

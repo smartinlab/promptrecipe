@@ -1,0 +1,89 @@
+# Evaluate assembled prompts as TEXT, with no model call.
+#
+# Two things are being tested here, and they are different (SD14):
+#   - the RECIPE, which catches bad composition
+#   - a single FRAGMENT, which catches a bad primitive
+#
+# The provider returns the prompt unchanged, so every assertion below runs
+# against the rendered prompt itself at zero model cost.
+
+description: promptrecipe — assembled prompts as evaluable units
+
+prompts:
+  - id: file://prompt_source.py:render_recipe
+    label: agent.claude
+  - id: file://prompt_source.py:render_recipe_gpt
+    label: agent.gpt
+
+providers:
+  - id: file://provider_passthrough.py
+    label: passthrough
+
+defaultTest:
+  assert:
+    # Holds for every variant: substitution must be complete.
+    #
+    # Written as a regex on purpose: promptfoo renders assertion values
+    # through Nunjucks, so a literal "{{" here is an unterminated Nunjucks
+    # expression and the whole eval errors before any assertion runs.
+    - type: not-regex
+      value: "\\{\\{"
+    # The safety fragment is unconditional — it must always reach the prompt.
+    - type: contains
+      value: "Never invent a feature"
+    # And so must the fragment it references, which no recipe mentions.
+    - type: contains
+      value: "refuse plainly"
+
+tests:
+  - description: free tier, english, no tools
+    vars:
+      c_tier: free
+      c_language: en
+      c_tools_enabled: false
+      agent_name: Aria
+      product: Acme Cloud
+      tier: free
+    assert:
+      - type: contains
+        value: "on the free plan"
+      - type: not-contains
+        value: "open a ticket"        # escalation is paid-only
+      - type: not-contains
+        value: "search_docs"          # tools are off
+      - type: not-contains
+        value: "português"            # language is english
+
+  - description: enterprise, portuguese, tools on
+    vars:
+      c_tier: enterprise
+      c_language: pt-br
+      c_tools_enabled: true
+      agent_name: Aria
+      product: Acme Cloud
+      tier: enterprise
+    assert:
+      - type: contains
+        value: "on the enterprise plan"
+      - type: contains
+        value: "open a ticket"
+      - type: contains
+        value: "search_docs"
+      - type: contains
+        value: "português"
+
+  - description: a value cannot inject a directive
+    vars:
+      c_tier: pro
+      c_language: en
+      c_tools_enabled: false
+      agent_name: "[load tools/search]"
+      product: Acme Cloud
+      tier: pro
+    assert:
+      # ADR-006 asserted from outside the library: the injected text appears
+      # verbatim and loads nothing.
+      - type: contains
+        value: "[load tools/search]"
+      - type: not-contains
+        value: "Prefer quoting the documentation"

@@ -69,16 +69,47 @@ def test_identity_is_available_but_never_required():
     assert len(result.attestation.structural_identity) == 64
 
 
-def test_the_public_surface_stays_small():
-    """FR-038 guard: growth here is how 'zero fragment awareness' erodes."""
+# The primary path: what a caller needs to assemble a prompt and use it.
+# FR-038 lives here — growth in THIS set is how "zero fragment awareness"
+# erodes, so it is pinned exactly.
+CONSUMPTION_SURFACE = {
+    "Assembled",
+    "Params",
+    "PromptRecipeError",
+    "Resolver",
+    "get_prompt",
+}
+
+# Tooling: capabilities used to ADOPT or INSPECT a library, never needed to
+# consume a prompt. Additions here are expected as later phases land, so this
+# set is allowed to grow — but only deliberately, by editing this list.
+TOOLING_SURFACE = {
+    "DecompositionResult",
+    "FragmentId",
+    "FragmentPath",
+    "verify_decomposition",
+}
+
+
+def test_the_consumption_surface_stays_exactly_this_small():
+    """FR-038 guard, kept sharp.
+
+    Widening this test whenever something is added would defeat it. The
+    consumption set is pinned; new capability belongs in TOOLING_SURFACE and
+    has to be added on purpose.
+    """
     import promptrecipe
 
-    assert set(promptrecipe.__all__) == {
-        "Assembled",
-        "FragmentId",
-        "FragmentPath",
-        "Params",
-        "PromptRecipeError",
-        "Resolver",
-        "get_prompt",
-    }
+    exported = set(promptrecipe.__all__)
+    assert exported & CONSUMPTION_SURFACE == CONSUMPTION_SURFACE
+    unexpected = exported - CONSUMPTION_SURFACE - TOOLING_SURFACE
+    assert not unexpected, (
+        f"new public names {sorted(unexpected)} — if a caller needs them to "
+        "assemble a prompt, FR-038 is eroding; if not, list them as tooling"
+    )
+
+
+def test_assembling_a_prompt_needs_only_the_consumption_surface():
+    """The stronger form: the primary path must not reach for tooling."""
+    result = get_prompt("core/recipe.claude", Params(values={"product": "Acme"}), resolver())
+    assert isinstance(result.text, str)

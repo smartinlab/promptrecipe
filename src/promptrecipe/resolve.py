@@ -30,6 +30,7 @@ class TraceEntry:
     namespace: str
     source: str
     found: bool
+    precedence: int = 0
 
 
 @dataclass(slots=True)
@@ -38,11 +39,36 @@ class ResolutionTrace:
     entries: list[TraceEntry] = field(default_factory=list)
     winner: str | None = None
 
+    def explain(self) -> str:
+        """Why this reference resolved where it did (FR-030).
+
+        Gate 0 found that mature precedence systems become confusing at scale
+        precisely because they are not inspectable. This is the mitigation, so
+        it is part of the type rather than a debugging afterthought.
+        """
+        lines = [f"resolving '{self.path}':"]
+        for e in self.entries:
+            mark = "found" if e.found else "     "
+            won = "  <- winner" if e.found and e.source == self.winner else ""
+            lines.append(f"  [{mark}] {e.source} (precedence {e.precedence}){won}")
+        if self.winner is None:
+            lines.append("  no source matched")
+        return "\n".join(lines)
+
 
 @dataclass(frozen=True, slots=True)
 class Source:
     name: str
     custody: Custody
+    precedence: int = 0
+    """Higher wins. Layering is opt-in and DECLARED.
+
+    ADR-004 forbids resolving a collision by registration order, because that
+    makes shadowing invisible. A precedence difference is an explicit
+    statement by the person configuring the resolver — so an override is a
+    decision someone wrote down, not an accident of ordering. Equal
+    precedence remains ambiguous and still errors.
+    """
 
 
 class Resolver:
@@ -51,8 +77,20 @@ class Resolver:
     def __init__(self) -> None:
         self._namespaces: dict[str, list[Source]] = {}
 
-    def register(self, namespace: str, name: str, custody: Custody) -> Resolver:
-        self._namespaces.setdefault(namespace, []).append(Source(name=name, custody=custody))
+    def register(
+        self, namespace: str, name: str, custody: Custody, precedence: int = 0
+    ) -> Resolver:
+        """Register a source under a namespace.
+
+        `precedence` opts into layering: a higher value overrides a lower one
+        for the same path, and the resolution trace explains why (FR-030).
+        Sources left at the default share a precedence, so a collision between
+        them is still ambiguous and still errors — an override has to be
+        declared, never inferred from the order someone happened to register.
+        """
+        self._namespaces.setdefault(namespace, []).append(
+            Source(name=name, custody=custody, precedence=precedence)
+        )
         return self
 
     @property
@@ -86,24 +124,36 @@ class Resolver:
         """
         sources = self._sources_or_raise(path)
         trace = ResolutionTrace(path=str(path))
-        hits: list[tuple[str, FragmentContent]] = []
+        hits: list[Source] = []
 
         for source in sources:
             found = source.custody.exists(path)
             trace.entries.append(
-                TraceEntry(namespace=path.namespace, source=source.name, found=found)
+                TraceEntry(
+                    namespace=path.namespace,
+                    source=source.name,
+                    found=found,
+                    precedence=source.precedence,
+                )
             )
             if found:
-                hits.append((source.name, source.custody.read(path)))
+                hits.append(source)
 
         if not hits:
             raise FragmentNotFound(path=str(path), namespaces=self.known_namespaces)
-        if len(hits) > 1:
-            # ADR-004 / FR-031: never pick. Name every candidate.
-            raise AmbiguousReference(path=str(path), candidates=[name for name, _ in hits])
 
-        trace.winner = hits[0][0]
-        return hits[0][1], trace
+        top = max(h.precedence for h in hits)
+        winners = [h for h in hits if h.precedence == top]
+        if len(winners) > 1:
+            # ADR-004 / FR-031: never pick. Two sources at the same declared
+            # precedence means nobody said which should win.
+            raise AmbiguousReference(
+                path=str(path),
+                candidates=[f"{w.name} (precedence {w.precedence})" for w in winners],
+            )
+
+        trace.winner = winners[0].name
+        return winners[0].custody.read(path), trace
 
     def resolve(self, path: FragmentPath) -> tuple[FragmentId, ResolutionTrace]:
         """Resolve a path to exactly one fragment identity."""

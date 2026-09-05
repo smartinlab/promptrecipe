@@ -14,7 +14,7 @@ fragments load, their order, or their version.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from promptrecipe.errors import ExpectationFailed, UndefinedVariable
 from promptrecipe.identity import FragmentId
@@ -37,6 +37,13 @@ from promptrecipe.parser.nodes import (
     Var,
 )
 from promptrecipe.paths import FragmentPath
+from promptrecipe.provenance import (
+    Attestation,
+    Producer,
+    ResolvedDependency,
+    instance_identity,
+    structural_identity,
+)
 from promptrecipe.resolve import Resolver
 
 Value = str | int | bool
@@ -61,6 +68,8 @@ class Params:
 @dataclass(slots=True)
 class Assembled:
     text: str
+    attestation: Attestation
+    """Emitted here, at assembly time — never reconstructed (SD5)."""
     fragments: list[tuple[str, FragmentId]] = field(default_factory=list)
     """Fragments in assembly ORDER. A list, never a set — order is identity (SD13)."""
     condition_outcomes: list[tuple[str, bool]] = field(default_factory=list)
@@ -214,4 +223,26 @@ def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
     # influence which fragments loaded, their order, or their version.
     text = _substitute("".join(parts), params.values)
 
-    return Assembled(text=text, fragments=fragments, condition_outcomes=condition_outcomes)
+    # --- provenance: produced HERE, as a return value, so it cannot be
+    # reconstructed after the fact when inputs may have changed (SD5).
+    attestation = Attestation(
+        subject=FragmentId.of(text.encode("utf-8")).hex,
+        resolved_dependencies=[
+            ResolvedDependency(path=path, identity=fid.hex) for path, fid in fragments
+        ],
+        condition_outcomes=list(condition_outcomes),
+        resolved_order=[path for path, _ in fragments],
+        address_resolutions=sorted(params.addresses.items()),
+        value_bindings=sorted(params.values.items()),
+        producer=Producer(),
+        recorded_at=None,
+    )
+    attestation = replace(attestation, structural_identity=structural_identity(attestation))
+    attestation = replace(attestation, instance_identity=instance_identity(attestation))
+
+    return Assembled(
+        text=text,
+        attestation=attestation,
+        fragments=fragments,
+        condition_outcomes=condition_outcomes,
+    )

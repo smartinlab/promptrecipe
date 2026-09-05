@@ -31,23 +31,37 @@ class FsCustody:
         # Sorted: this list appears in error messages, which must be stable.
         return sorted(self._roots)
 
-    def _file_for(self, path: FragmentPath) -> Path:
+    def _file_for(self, path: FragmentPath) -> Path | None:
+        """Map a fragment path to a file.
+
+        The extension is APPENDED, never substituted. `Path.with_suffix`
+        would turn `recipe.claude` into `recipe.md`, because it treats
+        `.claude` as an existing suffix and replaces it — which would break
+        the whole model-variant naming convention (`tone.claude`,
+        `tone.gpt`) that amendment 6's driving use case depends on.
+
+        Returns None when the path names no fragment (a bare namespace).
+        """
         root = self._roots.get(path.namespace)
         if root is None:
             raise UnknownNamespace(
                 namespace=path.namespace, path=str(path), known=self.known_namespaces
             )
-        return root.joinpath(*path.segments).with_suffix(f".{self._extension}")
+        if not path.segments:
+            return None
+        *parents, name = path.segments
+        return root.joinpath(*parents) / f"{name}.{self._extension}"
 
     def exists(self, path: FragmentPath) -> bool:
         try:
-            return self._file_for(path).is_file()
+            file = self._file_for(path)
         except UnknownNamespace:
             return False
+        return file is not None and file.is_file()
 
     def read(self, path: FragmentPath) -> FragmentContent:
         file = self._file_for(path)
-        if not file.is_file():
+        if file is None or not file.is_file():
             raise FragmentNotFound(path=str(path), namespaces=self.known_namespaces)
         return FragmentContent.of(file.read_bytes())
 
@@ -55,10 +69,13 @@ class FsCustody:
         root = self._roots.get(namespace)
         if root is None:
             raise UnknownNamespace(namespace=namespace, path=namespace, known=self.known_namespaces)
+        suffix = f".{self._extension}"
         found = [
-            FragmentPath.parse(f"{namespace}/{f.stem}")
+            # Strip exactly the extension we appended — `f.stem` would drop
+            # `.claude` from `tone.claude.md` and collapse model variants.
+            FragmentPath.parse(f"{namespace}/{f.name[: -len(suffix)]}")
             for f in root.iterdir()
-            if f.is_file() and f.suffix == f".{self._extension}"
+            if f.is_file() and f.name.endswith(suffix)
         ]
         # Directory iteration order is not stable across platforms and must
         # never reach output (TRD §4). Sort explicitly.

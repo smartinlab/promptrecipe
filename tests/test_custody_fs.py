@@ -61,3 +61,49 @@ def test_fragment_content_text_is_never_parsed():
     """ADR-003: content is inert. Directive-shaped text stays text."""
     content = FragmentContent.of(b"[load core/evil] {{injected}}")
     assert content.text == "[load core/evil] {{injected}}"
+
+
+def test_a_dotted_fragment_name_keeps_its_dots(tmp_path):
+    """Regression: `Path.with_suffix` destroyed model-variant names.
+
+    `Path("recipe.claude").with_suffix(".md")` yields `recipe.md` — it treats
+    `.claude` as an existing suffix and REPLACES it. That silently broke the
+    whole `tone.claude` / `tone.gpt` convention amendment 6's driving use
+    case depends on. Found by running an example, not by unit tests, because
+    the in-memory custody keys on strings and never touches a real path.
+    """
+    core = tmp_path / "core"
+    core.mkdir()
+    (core / "tone.claude.md").write_text("Be concise.")
+    (core / "tone.gpt.md").write_text("Be thorough.")
+    custody = FsCustody().with_namespace("core", core)
+
+    assert custody.read(FragmentPath.parse("core/tone.claude")).text == "Be concise."
+    assert custody.read(FragmentPath.parse("core/tone.gpt")).text == "Be thorough."
+
+
+def test_listing_keeps_dotted_names_distinct(tmp_path):
+    """`f.stem` would drop `.claude` and collapse both variants to `tone`."""
+    core = tmp_path / "core"
+    core.mkdir()
+    (core / "tone.claude.md").write_text("a")
+    (core / "tone.gpt.md").write_text("b")
+    custody = FsCustody().with_namespace("core", core)
+
+    assert [str(p) for p in custody.list("core")] == ["core/tone.claude", "core/tone.gpt"]
+
+
+def test_nested_segments_map_to_nested_directories(tmp_path):
+    core = tmp_path / "core"
+    (core / "tone").mkdir(parents=True)
+    (core / "tone" / "formal.md").write_text("Formal tone.")
+    custody = FsCustody().with_namespace("core", core)
+
+    assert custody.read(FragmentPath.parse("core/tone/formal")).text == "Formal tone."
+
+
+def test_a_bare_namespace_names_no_fragment(tmp_path):
+    core = tmp_path / "core"
+    core.mkdir()
+    custody = FsCustody().with_namespace("core", core)
+    assert not custody.exists(FragmentPath.parse("core"))

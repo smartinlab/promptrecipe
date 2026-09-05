@@ -30,6 +30,13 @@ jobs:
         run: ruff format --check .
       - name: Test
         run: pytest
+      - name: Quickstart walkthrough (metric M11 — fails over 30 minutes)
+        run: python scripts/quickstart_walkthrough.py
+      - name: Performance budget (TRD §8)
+        # One interpreter only: a benchmark across the full matrix measures
+        # runner noise more than it measures this library.
+        if: matrix.python == '3.12' && matrix.os == 'ubuntu-latest'
+        run: python scripts/benchmark.py
 
   supply-chain:
     runs-on: ubuntu-latest

@@ -5,5 +5,8 @@ line-length = 100
 select = ["E", "F", "I", "UP", "B", "SIM", "S"]
 
 [lint.per-file-ignores]
+# `assert` is the point in these: tests verify, scripts and examples
+# demonstrate a property by asserting it holds.
 "tests/**" = ["S101"]
 "scripts/**" = ["S101"]
+"examples/**" = ["S101"]

@@ -9,12 +9,13 @@ result = promptrecipe.get_prompt("core/recipe.claude", params, resolver)
 agent = Agent(system_prompt=result.text)  # the caller never sees a fragment
 ```
 
-**Status: planning complete, implementation not started.**
+**Status: Phase 1 complete.** `get_prompt` works, is deterministic, and every
+assembly is attributable. Python 3.11+, one runtime dependency, pure-Python
+wheel. See [QUICKSTART.md](QUICKSTART.md).
 
-This repository currently contains only the pre-dev artifacts. The first code
-commit is [ST-001-01](docs/pre-dev/promptrecipe/subtasks/T-001/ST-001-01-init-repo-and-package.md),
-which creates the package layout. This README is replaced by the real one at
-[ST-007-01](docs/pre-dev/promptrecipe/subtasks/T-007/ST-007-01-packaging.md).
+Phase 2 onward (reproduction from a record, span mapping, dependency queries,
+evaluation and optimization adapters, remote custody) is planned in
+[tasks.md](docs/pre-dev/promptrecipe/tasks.md) — tasks T-009 to T-027.
 
 ## The plan
 
@@ -40,8 +41,16 @@ which creates the package layout. This README is replaced by the real one at
 | **P3** | Fragment content is never evaluated | ST-003-02, ST-002-04 |
 | **P4** | No partial output on any failure path | ST-005-01 |
 
+## Measured, not assumed
+
+| | Result |
+|---|---|
+| Assembly, warm p99 | **0.842 ms** against a 10 ms budget — 0.14% of a 500 ms model call |
+| Dependency audit | `pip-audit` clean; licences verified from package metadata |
+| Determinism | identical output across processes with distinct hash seeds |
+| Wheel | `py3-none-any` — one artefact, every platform, no compiler |
+
 ## Known open items
 
-- `pip-audit` has never run against the pinned versions — [ST-001-03](docs/pre-dev/promptrecipe/subtasks/T-001/ST-001-03-audit-and-licenses.md), blocking before code.
-- None of the planned code has been executed. The first `pytest` is the real verification.
 - Remote custody without version control inherits no review — blocks T-026 (Phase 4), needs a product decision.
+- Coverage tooling is not pinned; `pytest-cov` was deliberately deferred rather than added unpinned.

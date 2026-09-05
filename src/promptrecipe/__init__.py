@@ -14,9 +14,12 @@ from promptrecipe.errors import PromptRecipeError
 from promptrecipe.identity import FragmentId
 from promptrecipe.parser.parse import parse
 from promptrecipe.paths import FragmentPath
+from promptrecipe.provenance import PRODUCER_VERSION
 from promptrecipe.resolve import Resolver
 
-__version__ = "0.1.0"
+# One source of truth: the attestation's producer version and the package
+# version cannot drift apart across a release bump.
+__version__ = PRODUCER_VERSION
 
 __all__ = [
     "Assembled",

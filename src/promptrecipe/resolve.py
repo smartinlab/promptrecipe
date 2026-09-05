@@ -72,17 +72,21 @@ class Resolver:
             )
         return sources
 
-    def resolve(self, path: FragmentPath) -> tuple[FragmentId, ResolutionTrace]:
-        """Resolve a path to exactly one fragment identity.
+    def fetch(self, path: FragmentPath) -> tuple[FragmentContent, ResolutionTrace]:
+        """Resolve a path to exactly one fragment and return its content.
 
-        Every source registered for the namespace is consulted — deliberately
-        NOT short-circuited on the first hit. Short-circuiting would make
-        ambiguity undetectable, which is the silent-shadowing failure that
-        ADR-004 exists to prevent.
+        THE single lookup path. Every source registered for the namespace is
+        consulted — deliberately NOT short-circuited on the first hit, because
+        short-circuiting makes ambiguity undetectable, which is the
+        silent-shadowing failure ADR-004 exists to prevent.
+
+        Content is read once here and returned, rather than read to compute an
+        identity and then re-read by the caller. Two lookup paths is how the
+        original `read()` came to bypass the ambiguity check entirely.
         """
         sources = self._sources_or_raise(path)
         trace = ResolutionTrace(path=str(path))
-        hits: list[tuple[str, FragmentId]] = []
+        hits: list[tuple[str, FragmentContent]] = []
 
         for source in sources:
             found = source.custody.exists(path)
@@ -90,7 +94,7 @@ class Resolver:
                 TraceEntry(namespace=path.namespace, source=source.name, found=found)
             )
             if found:
-                hits.append((source.name, source.custody.read(path).id))
+                hits.append((source.name, source.custody.read(path)))
 
         if not hits:
             raise FragmentNotFound(path=str(path), namespaces=self.known_namespaces)
@@ -101,9 +105,17 @@ class Resolver:
         trace.winner = hits[0][0]
         return hits[0][1], trace
 
+    def resolve(self, path: FragmentPath) -> tuple[FragmentId, ResolutionTrace]:
+        """Resolve a path to exactly one fragment identity."""
+        content, trace = self.fetch(path)
+        return content.id, trace
+
     def read(self, path: FragmentPath) -> FragmentContent:
-        """Read the content a path resolves to. Delegates the only I/O to custody."""
-        for source in self._sources_or_raise(path):
-            if source.custody.exists(path):
-                return source.custody.read(path)
-        raise FragmentNotFound(path=str(path), namespaces=self.known_namespaces)
+        """Read the content a path resolves to.
+
+        Goes through `fetch`, so an ambiguous reference raises here exactly as
+        it does in `resolve`. It previously scanned for the first match, which
+        let `get_prompt` fetch the RECIPE itself without an ambiguity check —
+        silently picking a winner in the one place ADR-004 most needed to hold.
+        """
+        return self.fetch(path)[0]

@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from promptrecipe.custody import FragmentContent
-from promptrecipe.errors import FragmentNotFound, UnknownNamespace
+from promptrecipe.errors import FragmentNotFound, PathEscapesNamespace, UnknownNamespace
 from promptrecipe.identity import FragmentId
 from promptrecipe.paths import FragmentPath
 
@@ -23,7 +23,9 @@ class FsCustody:
         self._extension = extension
 
     def with_namespace(self, namespace: str, root: Path | str) -> FsCustody:
-        self._roots[namespace] = Path(root)
+        # Resolved once, so confinement checks compare real paths rather than
+        # whichever spelling the caller happened to pass.
+        self._roots[namespace] = Path(root).resolve()
         return self
 
     @property
@@ -50,13 +52,30 @@ class FsCustody:
         if not path.segments:
             return None
         *parents, name = path.segments
-        return root.joinpath(*parents) / f"{name}.{self._extension}"
+        candidate = root.joinpath(*parents) / f"{name}.{self._extension}"
+
+        # Path canonicalization is LEXICAL by design (ADR-001 keeps paths.py
+        # free of I/O), so it cannot see a symlink. Without this check a
+        # symlink under the namespace root — planted by the same optimizer or
+        # remote-custody actor the threat model treats as untrusted — reads
+        # any file on the machine. Confinement has to be re-checked against
+        # the real filesystem at the one place that touches it.
+        try:
+            real = candidate.resolve()
+        except OSError:
+            return candidate
+        if real != root and root not in real.parents:
+            raise PathEscapesNamespace(path=str(path), root=str(root))
+        return candidate
 
     def exists(self, path: FragmentPath) -> bool:
         try:
             file = self._file_for(path)
         except UnknownNamespace:
             return False
+        # PathEscapesNamespace deliberately propagates: a fragment that
+        # escapes its root is a configuration error to surface, not an
+        # absence to report quietly.
         return file is not None and file.is_file()
 
     def read(self, path: FragmentPath) -> FragmentContent:

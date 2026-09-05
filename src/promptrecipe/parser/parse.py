@@ -6,7 +6,7 @@ generator, and adds no dependency (E7).
 
 from __future__ import annotations
 
-from promptrecipe.errors import ParseError, Position
+from promptrecipe.errors import DepthLimitExceeded, ParseError, Position
 from promptrecipe.parser.lexer import Kind, Token, tokenize
 from promptrecipe.parser.nodes import (
     And,
@@ -33,11 +33,22 @@ from promptrecipe.parser.nodes import (
 _DIRECTIVES = "load, if, order, expect"
 _NOWHERE = Position(line=0, column=0)
 
+MAX_EXPRESSION_DEPTH = 64
+"""Ceiling on nested expression depth.
+
+Recursive descent uses one Python frame per nesting level, so without a
+ceiling roughly 200 nested parentheses exhaust the interpreter stack and
+raise a bare RecursionError — not a PromptRecipeError, so a caller following
+the documented `except PromptRecipeError` cannot catch it. 64 is far beyond
+any legible condition and far below the stack limit.
+"""
+
 
 class _Parser:
     def __init__(self, source: str) -> None:
         self._tokens = tokenize(source)
         self._i = 0
+        self._depth = 0
 
     # --- helpers ------------------------------------------------------------
 
@@ -73,7 +84,13 @@ class _Parser:
     # --- expressions --------------------------------------------------------
 
     def expression(self) -> Expr:
-        return self._or()
+        self._depth += 1
+        if self._depth > MAX_EXPRESSION_DEPTH:
+            raise DepthLimitExceeded(limit=MAX_EXPRESSION_DEPTH, path="condition expression")
+        try:
+            return self._or()
+        finally:
+            self._depth -= 1
 
     def _or(self) -> Expr:
         left = self._and()
@@ -144,7 +161,15 @@ class _Parser:
             if tok.value == "false":
                 return Literal(False)
             if tok.value == "not":
-                return Not(self._primary())
+                self._depth += 1
+                if self._depth > MAX_EXPRESSION_DEPTH:
+                    raise DepthLimitExceeded(
+                        limit=MAX_EXPRESSION_DEPTH, path="condition expression"
+                    )
+                try:
+                    return Not(self._primary())
+                finally:
+                    self._depth -= 1
             return Var(tok.value, tok.position)
         raise ParseError(
             position=tok.position, expected="a value, variable, or '('", found=tok.value

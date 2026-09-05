@@ -25,10 +25,18 @@ class ResolvedDependency:
     identity: str
 
 
+PRODUCER_VERSION = "0.1.0"
+"""Single source of truth for the version stamped into every attestation.
+
+`promptrecipe.__version__` re-exports this rather than declaring its own, so a
+release bump cannot leave attestations reporting a stale producer.
+"""
+
+
 @dataclass(frozen=True, slots=True)
 class Producer:
     name: str = "promptrecipe"
-    version: str = "0.1.0"
+    version: str = PRODUCER_VERSION
     # Recorded so a future change of digest algorithm is detectable, not silent.
     digest_algorithm: str = DIGEST_ALGORITHM
 
@@ -82,6 +90,25 @@ class Attestation:
         )
 
 
+def _esc(field: str) -> str:
+    """Escape a field so it cannot forge canonical-form structure.
+
+    The canonical form separates fields with TAB and records with NEWLINE.
+    Without escaping, any caller-supplied string carrying a literal tab or
+    newline could inject a fake record and reconstruct a DIFFERENT
+    attestation's canonical text byte-for-byte — making two structurally
+    different assemblies share a structural_identity, and silently corrupting
+    exactly the A/B comparison that identity exists to make trustworthy.
+
+    Backslash is escaped first so the mapping is injective: distinct inputs
+    always produce distinct outputs, which is what makes collision impossible
+    rather than merely unlikely.
+    """
+    return (
+        field.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "\\r")
+    )
+
+
 def canonical_structural_form(a: Attestation) -> str:
     """Canonical text for the STRUCTURAL identity.
 
@@ -94,19 +121,21 @@ def canonical_structural_form(a: Attestation) -> str:
     """
     lines: list[str] = ["deps"]
     # NOT sorted: assembly order is meaningful.
-    lines += [f"{d.path}\t{d.identity}" for d in a.resolved_dependencies]
+    lines += [f"{_esc(d.path)}\t{_esc(d.identity)}" for d in a.resolved_dependencies]
 
     lines.append("order")
-    lines += list(a.resolved_order)
+    lines += [_esc(name) for name in a.resolved_order]
 
     lines.append("conditions")
-    lines += [f"{expr}\t{outcome}" for expr, outcome in sorted(a.condition_outcomes)]
+    lines += [f"{_esc(expr)}\t{outcome}" for expr, outcome in sorted(a.condition_outcomes)]
 
     lines.append("addresses")
-    lines += [f"{name}\t{path}" for name, path in sorted(a.address_resolutions)]
+    lines += [f"{_esc(name)}\t{_esc(path)}" for name, path in sorted(a.address_resolutions)]
 
     lines.append("producer")
-    lines.append(f"{a.producer.name}\t{a.producer.version}\t{a.producer.digest_algorithm}")
+    lines.append(
+        f"{_esc(a.producer.name)}\t{_esc(a.producer.version)}\t{_esc(a.producer.digest_algorithm)}"
+    )
 
     return "\n".join(lines) + "\n"
 
@@ -115,7 +144,7 @@ def canonical_instance_form(a: Attestation) -> str:
     """Canonical text for the INSTANCE identity: the structural form plus the
     value bindings, sorted."""
     lines = [canonical_structural_form(a).rstrip("\n"), "values"]
-    lines += [f"{name}\t{value}" for name, value in sorted(a.value_bindings)]
+    lines += [f"{_esc(name)}\t{_esc(value)}" for name, value in sorted(a.value_bindings)]
     return "\n".join(lines) + "\n"
 
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from promptrecipe.errors import UndecodableFragment
 from promptrecipe.identity import FragmentId
 from promptrecipe.paths import FragmentPath
 
@@ -31,8 +32,14 @@ class FragmentContent:
 
         Fragment content is INERT TEXT. It is never parsed or evaluated
         (ADR-003) — this property exists to insert it, not to interpret it.
+
+        A decode failure is wrapped: errors.py promises callers catch one
+        type, and a bare UnicodeDecodeError escapes that contract.
         """
-        return self.data.decode("utf-8")
+        try:
+            return self.data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise UndecodableFragment(identity=self.id.short, reason=str(exc)) from exc
 
 
 @runtime_checkable

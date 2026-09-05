@@ -16,7 +16,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
-from promptrecipe.errors import ExpectationFailed, UndefinedVariable
+from promptrecipe.errors import (
+    DepthLimitExceeded,
+    ExpectationFailed,
+    OrderNotImplemented,
+    UndefinedVariable,
+)
 from promptrecipe.identity import FragmentId
 from promptrecipe.parser.nodes import (
     And,
@@ -29,6 +34,7 @@ from promptrecipe.parser.nodes import (
     Not,
     NotEquals,
     Or,
+    Order,
     PathExpr,
     PathLiteral,
     Recipe,
@@ -47,6 +53,15 @@ from promptrecipe.provenance import (
 from promptrecipe.resolve import Resolver
 
 Value = str | int | bool
+
+MAX_EXPRESSION_DEPTH = 64
+"""Ceiling on expression-tree depth during evaluation.
+
+The parser bounds what it will build, but an AST can reach the evaluator by
+other routes. Bounding here too means a deep tree raises DepthLimitExceeded —
+a PromptRecipeError the documented `except` clause catches — rather than a
+bare RecursionError that escapes it.
+"""
 
 
 @dataclass(slots=True)
@@ -76,22 +91,26 @@ class Assembled:
     """Every condition and its outcome, so a branch can be replayed (SD6)."""
 
 
-def _value_of(expr: Expr, params: Params) -> Value:
+def _value_of(expr: Expr, params: Params, depth: int = 0) -> Value:
+    if depth > MAX_EXPRESSION_DEPTH:
+        raise DepthLimitExceeded(limit=MAX_EXPRESSION_DEPTH, path="condition expression")
     if isinstance(expr, Literal):
         return expr.value
     if isinstance(expr, Var):
         if expr.name not in params.controls:
             raise UndefinedVariable(name=expr.name, bound=list(params.controls))
         return params.controls[expr.name]
-    return _truth(expr, params)
+    return _truth(expr, params, depth + 1)
 
 
-def _truth(expr: Expr, params: Params) -> bool:
+def _truth(expr: Expr, params: Params, depth: int = 0) -> bool:
     """Evaluate an expression to a boolean.
 
     Total by construction: the grammar has no call, loop, or I/O node, so
     every recursion is structural and terminates (E3, ADR-003).
     """
+    if depth > MAX_EXPRESSION_DEPTH:
+        raise DepthLimitExceeded(limit=MAX_EXPRESSION_DEPTH, path="condition expression")
     if isinstance(expr, Literal):
         return bool(expr.value)
     if isinstance(expr, Var):
@@ -99,43 +118,45 @@ def _truth(expr: Expr, params: Params) -> bool:
             raise UndefinedVariable(name=expr.name, bound=list(params.controls))
         return bool(params.controls[expr.name])
     if isinstance(expr, Not):
-        return not _truth(expr.operand, params)
+        return not _truth(expr.operand, params, depth + 1)
     if isinstance(expr, And):
-        return _truth(expr.left, params) and _truth(expr.right, params)
+        return _truth(expr.left, params, depth + 1) and _truth(expr.right, params, depth + 1)
     if isinstance(expr, Or):
-        return _truth(expr.left, params) or _truth(expr.right, params)
+        return _truth(expr.left, params, depth + 1) or _truth(expr.right, params, depth + 1)
     if isinstance(expr, Equals):
-        return _value_of(expr.left, params) == _value_of(expr.right, params)
+        return _value_of(expr.left, params, depth + 1) == _value_of(expr.right, params, depth + 1)
     if isinstance(expr, NotEquals):
-        return _value_of(expr.left, params) != _value_of(expr.right, params)
+        return _value_of(expr.left, params, depth + 1) != _value_of(expr.right, params, depth + 1)
     if isinstance(expr, In):
-        needle = _value_of(expr.needle, params)
-        return any(_value_of(item, params) == needle for item in expr.haystack)
+        needle = _value_of(expr.needle, params, depth + 1)
+        return any(_value_of(item, params, depth + 1) == needle for item in expr.haystack)
     raise AssertionError(f"unreachable: unknown expression node {type(expr).__name__}")
 
 
-def _describe(expr: Expr) -> str:
+def _describe(expr: Expr, depth: int = 0) -> str:
     """A stable textual form of a condition, for provenance and messages.
 
     Must be deterministic: it reaches the provenance digest (SD6).
     """
+    if depth > MAX_EXPRESSION_DEPTH:
+        raise DepthLimitExceeded(limit=MAX_EXPRESSION_DEPTH, path="condition expression")
     if isinstance(expr, Literal):
         return repr(expr.value)
     if isinstance(expr, Var):
         return expr.name
     if isinstance(expr, Not):
-        return f"not {_describe(expr.operand)}"
+        return f"not {_describe(expr.operand, depth + 1)}"
     if isinstance(expr, And):
-        return f"({_describe(expr.left)} and {_describe(expr.right)})"
+        return f"({_describe(expr.left, depth + 1)} and {_describe(expr.right, depth + 1)})"
     if isinstance(expr, Or):
-        return f"({_describe(expr.left)} or {_describe(expr.right)})"
+        return f"({_describe(expr.left, depth + 1)} or {_describe(expr.right, depth + 1)})"
     if isinstance(expr, Equals):
-        return f"({_describe(expr.left)} == {_describe(expr.right)})"
+        return f"({_describe(expr.left, depth + 1)} == {_describe(expr.right, depth + 1)})"
     if isinstance(expr, NotEquals):
-        return f"({_describe(expr.left)} != {_describe(expr.right)})"
+        return f"({_describe(expr.left, depth + 1)} != {_describe(expr.right, depth + 1)})"
     if isinstance(expr, In):
-        items = ", ".join(_describe(i) for i in expr.haystack)
-        return f"({_describe(expr.needle)} in [{items}])"
+        items = ", ".join(_describe(i, depth + 1) for i in expr.haystack)
+        return f"({_describe(expr.needle, depth + 1)} in [{items}])"
     raise AssertionError(f"unreachable: unknown expression node {type(expr).__name__}")
 
 
@@ -198,23 +219,33 @@ def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
     condition_outcomes: list[tuple[str, bool]] = []
 
     def emit(stmt: Stmt) -> None:
-        if isinstance(stmt, Text):
-            parts.append(stmt.value)
-        elif isinstance(stmt, Load):
-            path = _path_for(stmt.path, params)
-            fragment_id, _trace = resolver.resolve(path)
-            parts.append(resolver.read(path).text)
-            fragments.append((str(path), fragment_id))
-        # Order and Expect produce no content here.
-
-    for stmt in recipe.statements:
         if isinstance(stmt, If):
+            # A nested `[if a][if b] x` used to fall through here and vanish
+            # with no error — silent wrong output, which PROJECT_RULES forbids.
             outcome = _truth(stmt.condition, params)
             condition_outcomes.append((_describe(stmt.condition), outcome))
             if outcome:
                 emit(stmt.body)
-        else:
-            emit(stmt)
+        elif isinstance(stmt, Order):
+            # Parsed since T-003 but never applied. Ordering is T-011 (Phase 2).
+            # Failing loudly is the only honest option: silently ignoring a
+            # declared order would produce a prompt whose fragment sequence
+            # contradicts the recipe, and order is part of identity (SD13).
+            raise OrderNotImplemented(names=list(stmt.names), position=stmt.position)
+        elif isinstance(stmt, Text):
+            parts.append(stmt.value)
+        elif isinstance(stmt, Load):
+            path = _path_for(stmt.path, params)
+            # One fetch: resolve and read were two independent lookups, which
+            # meant two I/O round-trips per fragment and — worse — two code
+            # paths that could disagree about ambiguity.
+            content, _trace = resolver.fetch(path)
+            parts.append(content.text)
+            fragments.append((str(path), content.id))
+        # Order and Expect produce no content here.
+
+    for stmt in recipe.statements:
+        emit(stmt)
 
     # --- 6. value substitution — LAST, single pass, never re-parsed --------
     #

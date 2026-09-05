@@ -129,3 +129,40 @@ class UndefinedVariable(PromptRecipeError):
     def __str__(self) -> str:
         listed = ", ".join(sorted(self.bound)) or "<none>"
         return f"undefined variable '{self.name}' (bound variables: {listed})"
+
+
+@dataclass(slots=True)
+class OrderNotImplemented(PromptRecipeError):
+    """`[order: ...]` parses but is not applied yet (T-011, Phase 2).
+
+    Raised rather than ignored: a silently-dropped order directive produces a
+    prompt whose fragment sequence contradicts the recipe, and order is part
+    of assembly identity (SD13) — so ignoring it would corrupt comparison too.
+    """
+
+    names: list[str] = field(default_factory=list)
+    position: Position | None = None
+
+    def __str__(self) -> str:
+        where = f" at {self.position}" if self.position else ""
+        listed = ", ".join(self.names)
+        return (
+            f"[order: {listed}]{where} is parsed but not applied yet "
+            "(ordering is planned as task T-011). Remove the directive, or "
+            "declare fragments in the sequence you want them assembled."
+        )
+
+
+@dataclass(slots=True)
+class UndecodableFragment(PromptRecipeError):
+    """Fragment bytes are not valid UTF-8.
+
+    Wrapped rather than allowed to surface as UnicodeDecodeError, so the
+    documented `except PromptRecipeError` really does catch every failure.
+    """
+
+    identity: str
+    reason: str
+
+    def __str__(self) -> str:
+        return f"fragment {self.identity} is not valid UTF-8: {self.reason}"

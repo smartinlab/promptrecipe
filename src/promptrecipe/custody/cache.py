@@ -35,7 +35,12 @@ class ContentCache:
     def put(self, content: FragmentContent) -> None:
         self._entries[content.id] = content.data
 
-    def keys(self) -> Iterator[FragmentId]:
+    def __iter__(self) -> Iterator[FragmentId]:
+        """Iterate the cached identities.
+
+        Iterable rather than exposing `.keys()`: the key type is the whole
+        point of this cache, so it belongs in the iteration protocol.
+        """
         return iter(self._entries)
 
     @property

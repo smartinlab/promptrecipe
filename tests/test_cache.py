@@ -46,4 +46,4 @@ def test_a_miss_is_counted_and_returns_none():
 def test_the_cache_is_keyed_by_fragment_id_not_by_path():
     cache = ContentCache()
     cache.put(FragmentContent.of(b"x"))
-    assert all(isinstance(k, FragmentId) for k in cache.keys())
+    assert all(isinstance(k, FragmentId) for k in cache)

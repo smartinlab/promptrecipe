@@ -212,7 +212,9 @@ class FragmentDirectiveNotAllowed(PromptRecipeError):
     def __str__(self) -> str:
         return (
             f"fragment '{self.path}' contains a '[{self.directive} ...]' directive "
-            f"near {self.excerpt!r}. A fragment may reference a sibling with "
+            f"near {self.excerpt!r}, and the fragment also references another "
+            "fragment. A fragment may reference a sibling with "
             "[load namespace/path] and nothing else — conditions, ordering and "
-            "expectations belong in the recipe, not in fragment content."
+            "expectations belong in the recipe. If this is ordinary prose, "
+            "either reword the brackets or move the reference to the recipe."
         )

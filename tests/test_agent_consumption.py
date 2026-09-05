@@ -85,6 +85,9 @@ CONSUMPTION_SURFACE = {
 # set is allowed to grow — but only deliberately, by editing this list.
 TOOLING_SURFACE = {
     "DecompositionResult",
+    "LibraryConfig",
+    "load_config",
+    "resolver_from_config",
     "FragmentId",
     "FragmentPath",
     "verify_decomposition",

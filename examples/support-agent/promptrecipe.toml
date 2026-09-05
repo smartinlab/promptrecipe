@@ -1,0 +1,7 @@
+# Declares the fragment library. Paths are relative to this file, so moving
+# the library moves its configuration with it.
+
+[namespaces]
+core   = "prompts/core"
+policy = "prompts/policy"
+tools  = "prompts/tools"

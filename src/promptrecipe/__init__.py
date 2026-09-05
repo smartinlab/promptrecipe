@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from promptrecipe.assemble import Assembled, Params, assemble
+from promptrecipe.config import LibraryConfig, load_config, resolver_from_config
 from promptrecipe.errors import PromptRecipeError
 from promptrecipe.identity import FragmentId
 from promptrecipe.parser.parse import parse
@@ -26,12 +27,15 @@ __version__ = PRODUCER_VERSION
 __all__ = [
     "Assembled",
     "DecompositionResult",
+    "LibraryConfig",
     "FragmentId",
     "FragmentPath",
     "Params",
     "PromptRecipeError",
     "Resolver",
     "get_prompt",
+    "load_config",
+    "resolver_from_config",
     "verify_decomposition",
 ]
 

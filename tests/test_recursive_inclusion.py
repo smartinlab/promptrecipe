@@ -174,20 +174,22 @@ def test_a_condition_inside_fragment_text_is_rejected():
     assert "if" in str(exc.value)
 
 
-def test_an_order_directive_inside_fragment_text_is_rejected():
-    with pytest.raises(FragmentDirectiveNotAllowed):
-        run(
-            {
-                "core/r": "[load core/a][load core/b]",
-                "core/a": "A[order: b, a]",
-                "core/b": "B",
-            }
-        )
+def test_an_order_directive_inside_fragment_text_never_reorders_anything():
+    """The fragment holds no reference, so it can fire nothing and the text is
+    left literal. What matters is that it does NOT reorder the assembly."""
+    out = run(
+        {
+            "core/r": "[load core/a][load core/b]",
+            "core/a": "A[order: b, a]",
+            "core/b": "B",
+        }
+    )
+    assert out.text == "A[order: b, a]B", "fragment text must not reorder the assembly"
 
 
-def test_an_expectation_inside_fragment_text_is_rejected():
-    with pytest.raises(FragmentDirectiveNotAllowed):
-        run({"core/r": "[load core/a]", "core/a": "[expect never] kept"})
+def test_an_expectation_inside_fragment_text_never_fails_an_assembly():
+    out = run({"core/r": "[load core/a]", "core/a": "[expect never] kept"})
+    assert out.text == "[expect never] kept"
 
 
 def test_ordinary_bracketed_prose_is_untouched():
@@ -202,13 +204,29 @@ def test_ordinary_bracketed_prose_is_untouched():
     assert out.text == "See [1] and [TODO] and [appendix B]."
 
 
-def test_a_variable_path_inside_fragment_text_is_rejected():
-    """A reference must be QUALIFIED. Honouring a bare identifier would let
-    untrusted content read from the caller's address space."""
+def test_a_variable_path_inside_fragment_text_is_not_resolved():
+    """A reference must be QUALIFIED. A bare identifier is not one, so it
+    stays literal — honouring it would let untrusted fragment content read
+    from the caller's address space."""
+    out = run(
+        {"core/r": "[load core/a]", "core/a": "[load secret_slot]", "core/x": "X"},
+        Params(addresses={"secret_slot": "core/x"}),
+    )
+    assert out.text == "[load secret_slot]"
+    assert "X" not in out.text, "the caller's address space must stay unreachable"
+
+
+def test_a_directive_shaped_bracket_is_rejected_once_the_fragment_can_load():
+    """The narrowed rule's other half: the same text IS refused when the
+    fragment holds a real reference, because then the load would fire while
+    the text reads as conditional."""
     with pytest.raises(FragmentDirectiveNotAllowed):
         run(
-            {"core/r": "[load core/a]", "core/a": "[load secret_slot]", "core/x": "X"},
-            Params(addresses={"secret_slot": "core/x"}),
+            {
+                "core/r": "[load core/a]",
+                "core/a": "[order: x]\n[load core/b]",
+                "core/b": "B",
+            }
         )
 
 

@@ -187,15 +187,22 @@ sibling and nothing else (ADR-003, E1).
 """
 
 DIRECTIVE_IN_FRAGMENT = re.compile(r"\[\s*(load|if|order|expect)\b")
-"""Any directive keyword appearing in fragment text.
+"""Directive-shaped text in a fragment.
 
-A fragment may reference; it may not branch, order, or assert. Text like
-`[if x] [load y]` is rejected rather than treated as literal-prose-plus-load:
-the load would happen unconditionally while looking conditional, which is
-precisely the silently-wrong output this codebase refuses everywhere else.
+A fragment may reference a sibling; it may not branch, order, or assert.
+`[if x] [load core/y]` must be rejected rather than left literal, because the
+load would fire unconditionally while looking conditional — the
+silently-wrong output this codebase refuses everywhere else.
 
-Ordinary bracketed prose — `[1]`, `[TODO]`, `[see appendix]` — is untouched,
-because only these four keywords are directives.
+But this pattern also matches ordinary prose. `[load balancer](url)` is a
+plausible markdown link, and `[if necessary] escalate` is plausible prompt
+text; rejecting a fragment for those would be a false positive on writing
+people legitimately want.
+
+The resolution: directive-shaped prose is only DANGEROUS in a fragment that
+can actually load something. A fragment holding no valid reference cannot
+fire anything no matter what its text looks like, so its brackets are left
+alone. See `_reject_directives`.
 """
 
 
@@ -276,17 +283,8 @@ def _expand(
     cursor = 0
     text = content.text
 
-    # Reject directive-shaped text that is not a plain qualified reference,
-    # before inlining anything.
     references = list(REFERENCE.finditer(text))
-    allowed = {(m.start(), m.end()) for m in references}
-    for found in DIRECTIVE_IN_FRAGMENT.finditer(text):
-        if not any(start <= found.start() < end for start, end in allowed):
-            raise FragmentDirectiveNotAllowed(
-                path=str(path),
-                directive=found.group(1),
-                excerpt=text[found.start() : found.start() + 40],
-            )
+    _reject_directives(path, text, references)
 
     for match in references:
         out.append(text[cursor : match.start()])
@@ -310,6 +308,32 @@ def _expand(
 
     out.append(text[cursor:])
     return "".join(out)
+
+
+def _reject_directives(path: FragmentPath, text: str, references: list[re.Match[str]]) -> None:
+    """Refuse directive-shaped text that a fragment must not carry.
+
+    Only applies when the fragment holds at least one valid reference. Without
+    a reference nothing can load, so `[if necessary]` or `[load balancer](url)`
+    is just prose with brackets in it — rejecting that would be a false
+    positive on ordinary markdown and ordinary prompt writing.
+
+    With a reference present, the same text is dangerous: `[if x] [load
+    core/y]` would load unconditionally while reading as conditional, so it is
+    rejected and the author is told to move the condition to the recipe.
+    """
+    if not references:
+        return
+
+    allowed = [(m.start(), m.end()) for m in references]
+    for found in DIRECTIVE_IN_FRAGMENT.finditer(text):
+        if any(start <= found.start() < end for start, end in allowed):
+            continue
+        raise FragmentDirectiveNotAllowed(
+            path=str(path),
+            directive=found.group(1),
+            excerpt=text[found.start() : found.start() + 40],
+        )
 
 
 def _apply_order(

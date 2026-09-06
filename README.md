@@ -163,7 +163,11 @@ entirely rather than trading one option for another.
 
 ## Licence
 
-[MIT](LICENSE).
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at
+your option — take whichever your legal review prefers. Apache-2.0 grants
+patent rights explicitly, which public-sector and enterprise counsel often
+want; MIT stays compatible with GPLv2, which Apache-2.0 is not. Offering both
+means nobody has to argue about it. [Why, in full](LICENSE).
 
 Contributions are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) lists the four
 properties that must never regress and the decisions that are settled, so you

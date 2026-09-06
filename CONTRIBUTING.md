@@ -62,8 +62,8 @@ next reader, write it down.
 
 ## Licence
 
-Contributions are accepted under the [MIT licence](LICENSE), the same terms
-the project ships under.
+Contributions are accepted under the same dual [MIT or
+Apache-2.0](LICENSE) terms the project ships under, unless you say otherwise.
 
 ## Reporting a bug
 

@@ -7,8 +7,8 @@ name = "promptrecipe"
 version = "0.1.0"
 description = "Compose prompts from path-addressed fragments, deterministically and attributably."
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT OR Apache-2.0"
+license-files = ["LICENSE", "LICENSE-MIT", "LICENSE-APACHE"]
 # Floor is 3.11, not 3.10: Python 3.10 reaches end-of-life in October 2026.
 # Ceiling matches the optimization integration target's own constraint.
 requires-python = ">=3.11,<3.15"

@@ -8,7 +8,13 @@ promptrecipe produces prompts and never executes them.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parents[1] / "src"))
+
+import _python_floor  # noqa: E402
+
+_python_floor.require()
 
 from promptrecipe.integrations.evaluation import passthrough_provider  # noqa: E402
 

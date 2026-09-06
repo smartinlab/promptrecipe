@@ -66,7 +66,9 @@ declared as extras. Neither may become load-bearing.
 | **Evaluation** | Recipes *and* individual fragments become evaluable units. With the pass-through provider, prompt-content assertions cost **zero model calls**. Verified: 6 cases, 38 assertions, all passing. |
 | **Optimization** | Seed a fragment's text; take improved text back as a **proposal with a diff**. Never written to custody — accepting a change is version control's job. Per-fragment only: a whole-recipe result carries no sub-fragment attribution. |
 
-See [integrations/promptfoo](integrations/promptfoo).
+See [integrations/promptfoo](integrations/promptfoo), and run the eval with
+`integrations/promptfoo/run_eval.sh` — promptfoo spawns `python3` from PATH,
+which is not this project's venv.
 
 ## Four properties that must never regress
 

@@ -8,8 +8,16 @@ dict carrying `vars`; they return a plain string.
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+# promptfoo may spawn this from any working directory, so both the sibling
+# guard module and the library have to be findable explicitly.
+sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
+
+import _python_floor  # noqa: E402
+
+_python_floor.require()
 
 from promptrecipe.custody.fs import FsCustody  # noqa: E402
 from promptrecipe.integrations.evaluation import (  # noqa: E402

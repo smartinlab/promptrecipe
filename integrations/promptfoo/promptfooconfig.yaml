@@ -7,6 +7,11 @@
 # The provider returns the prompt unchanged, so every assertion below runs
 # against the rendered prompt itself at zero model cost.
 
+# Run it with ./run_eval.sh, not `npx promptfoo eval` directly: promptfoo
+# spawns `python3` from PATH, which on macOS is the system 3.9 — below this
+# project's 3.11 floor. The scripts guard against that and say so, but the
+# script is the fix.
+
 description: promptrecipe — assembled prompts as evaluable units
 
 prompts:

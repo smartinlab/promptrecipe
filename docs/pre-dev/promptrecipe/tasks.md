@@ -416,9 +416,13 @@ Each is established by a **named task in the phase where the capability first ex
 **Goal:** shared libraries across teams; improvement that is adoptable rather than all-or-nothing.
 **Phase success:** M5 ≥ 80% · M9 ≤ 1 per 100.
 
-## T-025: Fragments live under version control as first-class custody
+## T-025: Fragments live under version control as first-class custody — ❌ DROPPED
 
-**Deliverable:** A versioned custody adapter reading the working tree, with history queries delegated rather than reimplemented.
+> **Stakeholder decision (2026-09-05): not built, and not deferred.** Fragments live in the repository of the project that consumes them, so that project's git already versions them. `FsCustody` reads its working tree; because a fragment is one file (ADR-007), `git log`, `git blame`, and pull-request review already work on it per fragment. A versioned custody adapter inside this library would reimplement what the host repository does better — the very duplication amendment 7 and ADR-007 delegated away. Building it would have been the delegation quietly walking itself back.
+>
+> **Consequences recorded:** C5's coverage is now delegation with no adapter at all, not delegation via an adapter. `FsCustody.versions()` returning exactly one identity is the final answer rather than a placeholder. **T-026 no longer requires this task, and its blocker gets sharper, not looser** — local custody is now the only place review comes from, so leaving it is the whole cost.
+
+**Original deliverable (for the record):** A versioned custody adapter reading the working tree, with history queries delegated rather than reimplemented.
 **Success:** *Functional:* fragments resolve from a version-controlled tree. *Technical:* **no version-control library dependency** — working-tree reads use the filesystem adapter; history shells out. *Operational:* one fragment = one separately diffable file (ADR-007). *Quality:* per-fragment review works naturally in a normal review workflow.
 **Value:** review, history, and origin come **free** — amendment 7's dividend collected. **Requirements:** FR-010 · ADR-007.
 **Dependencies:** Requires T-002. **Effort:** S · 5 pts · 2–4 days
@@ -431,9 +435,9 @@ Each is established by a **named task in the phase where the capability first ex
 **Deliverable:** A remote custody adapter where a fragment's identity is unchanged by where it lives.
 **Success:** *Functional:* fragments resolve from remote custody. *Technical:* identity is **verified on retrieval**; a mismatch against a pinned identity is an error, never tolerated. *Operational:* provenance recorded before a custody move still validates after it. *Quality:* cache-first, identity-keyed.
 **Value:** libraries shared across teams. **Requirements:** FR-009, FR-010 · SD1, SD2.
-**Dependencies:** Requires T-025.
+**Dependencies:** Requires T-002. *(Was T-025, which is dropped — see above.)*
 **Effort:** L · 13 pts · 1–2 weeks
-**Risks:** ⚠️ **Remote custody without version control inherits NO review** — **High impact / High probability.** The TRD stated two options (declare versioned custody a prerequisite, or build minimal review) and **chose neither**. **This task must not ship until that product decision is made** — it is a blocking decision, not a technical one. *Identity break at the boundary* — High/Low → verification on retrieval.
+**Risks:** ⚠️ **Remote custody without version control inherits NO review** — **High impact / High probability**, and **raised by dropping T-025**: with no versioned adapter, the consuming project's repository is the *only* source of review, so moving fragments out of it forfeits review entirely. The TRD stated two options (declare repository-resident custody a prerequisite, or build minimal review) and **chose neither**. **This task must not ship until that product decision is made** — it is a blocking decision, not a technical one. *Identity break at the boundary* — High/Low → verification on retrieval.
 **Testing:** integration (identity survives a custody move; mismatch errors; pre-move provenance still validates).
 **DoD:** reviewed · **the review-gap decision is made and documented** · identity verified on retrieval · mismatch errors.
 
@@ -467,13 +471,13 @@ T-001 ──> T-002 ──> T-004 ──┐
      T-018 · T-019 · T-020   |   T-021 ──> T-022   |   T-023 ──> T-024
 
      PHASE 4 ─────────────────────────────────────────────
-     T-025 ──> T-026(⚠ blocked on a product decision)   ·   T-027
+     T-025(❌ dropped)      T-026(⚠ blocked on a product decision)   ·   T-027
 ```
 
 **Critical path:** T-001 → T-002 → T-004 → **T-005** → **T-006** → T-007 → T-008.
 Seven tasks stand between nothing and a validated first-value demo. **T-005 and T-006 are the two Large tasks on that path** and carry properties P1 and P2 — they are where the plan is most likely to slip, and where slipping is most expensive.
 
-**Parallelizable:** T-003 alongside T-002/T-004 · T-017 alongside Phase 2 · Phase 3's three groups are mutually independent · T-027 alongside T-025.
+**Parallelizable:** T-003 alongside T-002/T-004 · T-017 alongside Phase 2 · Phase 3's three groups are mutually independent.
 
 | Phase | Tasks | Points | Rough duration |
 |---|---|---|---|
@@ -492,7 +496,7 @@ Seven tasks stand between nothing and a validated first-value demo. **T-005 and 
 
 | Category | Check | Result |
 |---|---|---|
-| **Task Completeness** | All TRD components have tasks | ✅ C1→T-002 · C2→T-004,T-017 · C3→T-005,T-009..T-012 · C4→T-006,T-018..T-020 · C5→T-025 (delegated) · C6→T-007,T-023,T-024,T-027 · C7→T-021,T-022,T-016 |
+| **Task Completeness** | All TRD components have tasks | ✅ C1→T-002 · C2→T-004,T-017 · C3→T-005,T-009..T-012 · C4→T-006,T-018..T-020 · C5→delegated outright, no adapter (T-025 dropped) · C6→T-007,T-023,T-024,T-027 · C7→T-021,T-022,T-016 |
 | | All PRD features have tasks | ✅ 31 built requirements covered; 6 delegated; 1 deferred |
 | | Each task appropriately sized | ✅ **no task exceeds 2 weeks**; 4 Large (13 pts), rest S/M |
 | **Delivery Value** | Every task delivers working software | ✅ — T-001 is the sole exception and **says so explicitly** rather than inventing user value |
@@ -518,7 +522,8 @@ Seven tasks stand between nothing and a validated first-value demo. **T-005 and 
 **Gate Result:** ✅ **PASS**
 
 **Carried forward:**
-- ⚠️ **T-026 is blocked on a product decision**, not on engineering: remote custody without version control inherits no review, and the TRD deliberately chose neither remedy. Must be decided before Phase 4.
+- ❌ **T-025 is dropped** (2026-09-05): the consuming project's own git versions the fragments; an adapter here would reimplement it.
+- ⚠️ **T-026 is blocked on a product decision**, not on engineering: remote custody without version control inherits no review, and the TRD deliberately chose neither remedy. Dropping T-025 sharpens this — repository-resident custody is now the only source of review. Must be decided before Phase 4.
 - ⚠️ Live traffic splitting remains out of scope by assumption, awaiting confirmation.
 - 🔴 Question A is now a version-control branch-protection setting rather than a product feature.
 - **Estimates should be recalibrated after Phase 1**, when real velocity exists.

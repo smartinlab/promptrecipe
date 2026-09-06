@@ -92,12 +92,20 @@ groups two different prompts as one and quietly corrupts every comparison.
 
 ## What is not built yet
 
-Phase 4 — custody:
+**T-025 version-controlled custody — dropped, not deferred.** Fragments live
+in the repository of the project that consumes them, so that project's own
+git already versions them. `FsCustody` reads its working tree; `git log`,
+`git blame`, and pull-request review work on fragments because a fragment is
+one file. A versioned custody adapter inside this library would reimplement
+what the host repository already does better — which is exactly what
+amendment 7 delegated away.
 
-- **T-025** version-controlled custody
-- **T-026** remote custody — ⚠️ **blocked on a product decision, not on
-  engineering**: remote custody without version control inherits no review,
-  and the TRD deliberately chose neither remedy.
+**T-026 remote custody** — ⚠️ still **blocked on a product decision, not on
+engineering.** Leaving the host repository is what forfeits review: a
+fragment in an object store has no diff, no blame, and no pull request. The
+TRD stated two remedies and deliberately chose neither. Dropping T-025
+sharpens the question rather than answering it, because local custody is now
+the *only* place review comes from.
 
 ## How this was built
 

@@ -101,5 +101,9 @@ class FsCustody:
         return sorted(found)
 
     def versions(self, path: FragmentPath) -> list[FragmentId]:
-        # The filesystem holds exactly one version: whatever is on disk now.
+        # Exactly one, and that is the final answer rather than a placeholder.
+        # Fragments live in the consuming project's repository, so history is
+        # that repository's `git log` — a fragment is one file, so it already
+        # has a diff, a blame, and a review. Reimplementing it here would undo
+        # the delegation in amendment 7.
         return [self.read(path).id]

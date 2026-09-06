@@ -57,3 +57,28 @@ O que muda:
 
 Antes de escrever código dessa vez: pesquisar o que já existe e escrever
 o que estou construindo.
+
+---
+
+## 2026-09-05 — custódia versionada não vai existir
+
+Ia construir um adaptador de custódia versionada (T-025). Não vou.
+
+O fragmento mora no repositório do projeto que consome a lib. Então o git
+*daquele* projeto já versiona o fragmento. `FsCustody` lê a working tree, e
+como um fragmento é um arquivo (ADR-007), `git log`, `git blame` e review de
+PR já funcionam por fragmento. Não falta nada.
+
+Construir o adaptador seria reimplementar o que o repositório hospedeiro faz
+melhor — que é exatamente o que o amendment 7 delegou pra fora. Teria sido a
+delegação voltando atrás em silêncio, com um nome de tarefa em cima.
+
+`FsCustody.versions()` devolver exatamente uma identidade deixa de ser
+provisório e passa a ser a resposta. Histórico é `git log`, não é atribuição
+desta lib.
+
+**O custo, que fica anotado:** isso deixa a T-026 (custódia remota) mais
+travada, não menos. Antes eu podia dizer "a custódia versionada é
+pré-requisito do review". Agora a única fonte de review é o repositório do
+projeto — então tirar o fragmento de lá não perde uma opção entre duas, perde
+o review inteiro. A pergunta de produto continua aberta e ficou mais afiada.

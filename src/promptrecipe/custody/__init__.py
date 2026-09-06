@@ -44,9 +44,14 @@ class FragmentContent:
 
 @runtime_checkable
 class Custody(Protocol):
-    """The narrow custody port. Four operations, so adapters stay thin."""
+    """The narrow custody port. Three operations, so adapters stay thin.
+
+    There is no `versions()`. Custody is the consuming project's repository
+    and nothing else, so a path holds exactly one fragment and history is that
+    repository's `git log` — an operation every adapter answered identically
+    was a seam reserved for a backend that no longer exists.
+    """
 
     def exists(self, path: FragmentPath) -> bool: ...
     def read(self, path: FragmentPath) -> FragmentContent: ...
     def list(self, namespace: str) -> list[FragmentPath]: ...
-    def versions(self, path: FragmentPath) -> list[FragmentId]: ...

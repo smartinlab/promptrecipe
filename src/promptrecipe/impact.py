@@ -248,5 +248,3 @@ class _OverlayCustody:
             FragmentPath.parse(k) for k in self._entries if k.startswith(f"{namespace}/")
         )
 
-    def versions(self, path: FragmentPath) -> list:
-        return [self.read(path).id]

@@ -5,12 +5,10 @@ CONDITIONAL LOADING, not a separate subsystem (SD4). These tests hold that
 claim to account — if a dedicated experimentation mechanism ever appears,
 they are what says it was not needed.
 
-`Custody.versions()` deliberately stays unused here. Under filesystem custody
-a version is a distinct PATH, which is what makes coexistence work without any
-new machinery; historical versions of one path belong to the consuming
-project's git, not to this library. The port keeps the operation for a backend
-that genuinely holds several versions at one address, such as an object store
-with versioning turned on.
+A version is a distinct PATH, which is what makes coexistence work without
+any new machinery — no versioning operation on the custody port, and none
+needed. Historical versions of one path belong to the consuming project's git,
+not to this library.
 """
 
 from conftest import MemoryCustody

@@ -193,6 +193,25 @@ class UndecodableFragment(PromptRecipeError):
 
 
 @dataclass(slots=True)
+class UnencodableValue(PromptRecipeError):
+    """A caller-supplied value is not encodable text.
+
+    A lone surrogate reaches Python as a `str` but has no UTF-8 encoding, so
+    it cannot be digested and the assembled prompt cannot be written anywhere.
+    Caught at the entrance rather than at the digest: raising here means no
+    content was produced (P4), and it means the caller's documented
+    `except PromptRecipeError` catches it instead of a bare UnicodeEncodeError
+    escaping from the middle of assembly.
+    """
+
+    name: str
+    reason: str
+
+    def __str__(self) -> str:
+        return f"value {self.name!r} is not encodable text: {self.reason}"
+
+
+@dataclass(slots=True)
 class FragmentDirectiveNotAllowed(PromptRecipeError):
     """Fragment text contains a directive other than a qualified reference.
 

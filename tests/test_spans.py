@@ -5,11 +5,13 @@ each one is. The difference matters when a prompt misbehaves: you want the
 file to open, not a list of eleven candidates.
 """
 
+import pytest
 from conftest import MemoryCustody
 from hypothesis import given
 from hypothesis import strategies as st
 
 from promptrecipe import Params, get_prompt
+from promptrecipe.errors import UnencodableValue
 from promptrecipe.resolve import Resolver
 
 LIB = {
@@ -125,10 +127,13 @@ def test_adjacent_text_from_one_fragment_reads_as_one_span():
 # --- the partition invariant, over generated substitutions ----------------
 
 
-@given(
-    st.text(alphabet=st.characters(blacklist_characters="{}[]"), max_size=40),
-    st.text(alphabet=st.characters(blacklist_characters="{}[]"), max_size=40),
+TEXT = st.text(
+    alphabet=st.characters(blacklist_characters="{}[]", blacklist_categories=("Cs",)),
+    max_size=40,
 )
+
+
+@given(TEXT, TEXT)
 def test_the_map_stays_a_partition_whatever_the_values(who: str, unused: str) -> None:
     """Substitution length is caller-controlled, so the remap must hold for
     values of any length — including empty and much-longer-than-placeholder."""
@@ -136,3 +141,12 @@ def test_the_map_stays_a_partition_whatever_the_values(who: str, unused: str) ->
     assert result.spans.covers(result.text)
     for earlier, later in zip(result.spans.spans, result.spans.spans[1:], strict=False):
         assert earlier.end == later.start
+
+
+def test_a_value_that_is_not_encodable_text_fails_before_anything_is_produced():
+    """A lone surrogate is a `str` with no UTF-8 encoding. It used to escape
+    as a bare UnicodeEncodeError from the middle of assembly — outside the
+    documented error contract, and after work was done. Found by the property
+    test above, which generated one."""
+    with pytest.raises(UnencodableValue):
+        assembled(who="\ud800")

@@ -25,6 +25,7 @@ from promptrecipe.errors import (
     ExpectationFailed,
     FragmentDirectiveNotAllowed,
     UndefinedVariable,
+    UnencodableValue,
     UnknownOrderName,
     UnorderedFragment,
 )
@@ -421,6 +422,20 @@ def assemble(
     recipe_identity: str = "",
 ) -> Assembled:
     """Assemble a recipe. Pure over what the resolver returns."""
+    # --- 0. caller-supplied text must be encodable -------------------------
+    #
+    # Checked here, before anything is produced, because identity is a digest
+    # over the output's BYTES: a lone surrogate is a `str` with no UTF-8
+    # encoding, so it would surface as a bare UnicodeEncodeError from the
+    # middle of assembly — outside the documented error contract, and after
+    # work had already been done. Found by the span-map property test driving
+    # generated values.
+    for name, value in sorted(params.values.items()):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise UnencodableValue(name=name, reason=exc.reason) from exc
+
     # --- 1. expectations, before any content exists (TRD §7) ---------------
     for expectation in recipe.expectations:
         if not _truth(expectation.condition, params):

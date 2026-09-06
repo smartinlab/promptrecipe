@@ -11,7 +11,6 @@ from pathlib import Path
 
 from promptrecipe.custody import FragmentContent
 from promptrecipe.errors import FragmentNotFound, PathEscapesNamespace, UnknownNamespace
-from promptrecipe.identity import FragmentId
 from promptrecipe.paths import FragmentPath
 
 
@@ -100,10 +99,3 @@ class FsCustody:
         # never reach output (TRD §4). Sort explicitly.
         return sorted(found)
 
-    def versions(self, path: FragmentPath) -> list[FragmentId]:
-        # Exactly one, and that is the final answer rather than a placeholder.
-        # Fragments live in the consuming project's repository, so history is
-        # that repository's `git log` — a fragment is one file, so it already
-        # has a diff, a blame, and a review. Reimplementing it here would undo
-        # the delegation in amendment 7.
-        return [self.read(path).id]

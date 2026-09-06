@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from promptrecipe.custody import FragmentContent
 from promptrecipe.errors import FragmentNotFound
-from promptrecipe.identity import FragmentId
 from promptrecipe.paths import FragmentPath
 
 
@@ -26,5 +25,3 @@ class MemoryCustody:
     def list(self, namespace: str) -> list[FragmentPath]:
         return sorted(FragmentPath.parse(k) for k in self._entries if k.startswith(f"{namespace}/"))
 
-    def versions(self, path: FragmentPath) -> list[FragmentId]:
-        return [self.read(path).id]

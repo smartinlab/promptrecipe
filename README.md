@@ -84,13 +84,23 @@ groups two different prompts as one and quietly corrupts every comparison.
 
 ## Measured, not assumed
 
+Every row below is a command in this repository, not an estimate.
+
 | | Result |
 |---|---|
-| Assembly, warm p99 | **0.967 ms** against a 10 ms budget — 0.14% of a 500 ms model call |
+| Test suite | **332 passing**, including property tests for the four never-regress properties |
+| Assembly, 50 fragments / ~50 KB | warm **p50 0.967 ms · p99 1.171 ms** against a 10 ms budget — **0.19%** of a 500 ms model call |
+| Determinism | byte-identical text *and* both identities across 5 distinct `PYTHONHASHSEED` values and with parameter insertion order reversed |
+| Reproduction | byte-identical from the attestation alone; editing one fragment on disk makes `drift()` name that fragment |
+| Evaluation | **6/6 cases, 38 assertions, zero model calls** (`integrations/promptfoo/run_eval.sh`) |
+| Optimization | round-trip through a real `dspy` 3.3.1 signature: no-op reports no change, an edit reports a diff, the file's trailing newline survives |
 | Dependency audit | `pip-audit` clean; licences read from package metadata |
-| Determinism | identical across processes with distinct `PYTHONHASHSEED` |
 | Wheel | `py3-none-any` — one artefact, every platform, no compiler |
-| First value | a scripted walkthrough of QUICKSTART.md, timed in CI |
+| First value | scripted walkthrough of QUICKSTART.md, timed in CI: **0.02 s** against a 1800 s budget |
+
+Not measured, by design: no row here involves a model call. The eval provider
+returns the prompt unchanged (SD10 — this library produces prompts and never
+executes them), which is exactly what makes prompt-content assertions free.
 
 ## Custody is your repository, and only your repository
 

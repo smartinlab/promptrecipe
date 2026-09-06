@@ -430,7 +430,11 @@ Each is established by a **named task in the phase where the capability first ex
 **Testing:** integration (resolve from a versioned tree; diff shows one fragment).
 **DoD:** reviewed · no version-control library added · per-fragment diff demonstrated.
 
-## T-026: Fragments can live remotely with identity intact
+## T-026: Fragments can live remotely with identity intact — ⏸ DEFERRED
+
+> **Stakeholder decision (2026-09-05): no remote custody for now.** Not blocked any more — withdrawn. The product question that blocked it (what happens to review when fragments leave the repository) is moot while there is nothing outside the repository. **The dividend: the TRD's A6 gap closes.** With repository-resident custody as the only custody, ADR-007's delegation of review, history, and origin to version control holds unconditionally instead of conditionally. The gap was resolved by removing the case, not by choosing a remedy.
+>
+> **What reopens it:** the decision below, unchanged and still unmade. Whoever picks this up decides first whether remote custody is *distribution* of an already-reviewed library (read-only; the gap stays closed) or *editing* outside the repository (review is forfeited entirely, and the library would have to build what amendment 7 said not to build).
 
 **Deliverable:** A remote custody adapter where a fragment's identity is unchanged by where it lives.
 **Success:** *Functional:* fragments resolve from remote custody. *Technical:* identity is **verified on retrieval**; a mismatch against a pinned identity is an error, never tolerated. *Operational:* provenance recorded before a custody move still validates after it. *Quality:* cache-first, identity-keyed.
@@ -471,7 +475,7 @@ T-001 ──> T-002 ──> T-004 ──┐
      T-018 · T-019 · T-020   |   T-021 ──> T-022   |   T-023 ──> T-024
 
      PHASE 4 ─────────────────────────────────────────────
-     T-025(❌ dropped)      T-026(⚠ blocked on a product decision)   ·   T-027
+     T-025(❌ dropped)      T-026(⏸ deferred)   ·   T-027
 ```
 
 **Critical path:** T-001 → T-002 → T-004 → **T-005** → **T-006** → T-007 → T-008.
@@ -523,7 +527,9 @@ Seven tasks stand between nothing and a validated first-value demo. **T-005 and 
 
 **Carried forward:**
 - ❌ **T-025 is dropped** (2026-09-05): the consuming project's own git versions the fragments; an adapter here would reimplement it.
-- ⚠️ **T-026 is blocked on a product decision**, not on engineering: remote custody without version control inherits no review, and the TRD deliberately chose neither remedy. Dropping T-025 sharpens this — repository-resident custody is now the only source of review. Must be decided before Phase 4.
+- ⏸ **T-026 is deferred** (2026-09-05): no remote custody for now. This **closes** the TRD's A6 gap — repository-resident custody being the only custody makes ADR-007's delegation unconditional. The unmade product decision is carried in the task, to be made if remote custody is ever revived.
+
+**No open blockers remain.** 26 of 27 tasks delivered; T-025 dropped, T-026 deferred.
 - ⚠️ Live traffic splitting remains out of scope by assumption, awaiting confirmation.
 - 🔴 Question A is now a version-control branch-protection setting rather than a product feature.
 - **Estimates should be recalibrated after Phase 1**, when real velocity exists.

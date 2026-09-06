@@ -167,7 +167,11 @@ The span map is produced *during* assembly because reconstructing it afterward w
 | A validation entry point that checks a proposed change is well-formed and reports affected recipes (FR-012) | Audit history storage |
 | Machine-proposed text routed to a specific fragment path (FR-026) | Identity or permission management |
 
-> **⚠️ Accepted limitation (assumption A6).** Under remote custody *without* version control, the delegated review story does not hold and this architecture provides no substitute. Two honest options exist and this document does **not** choose between them: (i) declare version-controlled custody a prerequisite for the review workflow, documenting remote custody as distribution-only; or (ii) build a minimal review capability later, accepting that it duplicates a solved problem. **This is a real gap, recorded rather than papered over.**
+> **⚠️ Accepted limitation (assumption A6) — ✅ RESOLVED 2026-09-05.** The gap as recorded: under remote custody *without* version control, the delegated review story does not hold and this architecture provides no substitute. Two options were stated and neither was chosen: (i) declare version-controlled custody a prerequisite, documenting remote custody as distribution-only; or (ii) build a minimal review capability later.
+>
+> **The stakeholder resolved it by removing the case rather than choosing a remedy.** Fragments live in the consuming project's repository, and there is no remote custody (T-026 deferred) and no versioned custody adapter (T-025 dropped — the host repository already versions them). With repository-resident custody as the *only* custody, A6 holds unconditionally and the delegation in ADR-007 is complete rather than conditional. This is stronger than option (i): remote custody is not documented as distribution-only, it does not exist.
+>
+> **What would reopen it:** any custody backend that is not the consuming project's repository. The review story is inherited from that repository and from nothing else, so leaving it forfeits review entirely — not one option out of two.
 
 ### C6 — Integration Surface *(SBP module 6)*
 
@@ -496,7 +500,7 @@ Conversely, building means owning parsing, diagnostics, and tooling, which is re
 
 **Carried forward:**
 - 🔴 **A** — largely dissolved by amendment 7; it is now a version-control branch-protection setting, not a product feature. No review system is architected.
-- ⚠️ **A6 gap** — remote custody without version control inherits no review. Two options stated in C5; **neither chosen**. Needs a decision before remote custody ships (Phase 4).
+- ✅ **A6 gap — CLOSED 2026-09-05** by removing the case: custody is repository-resident only. T-025 dropped (the host repository versions fragments), T-026 deferred (no remote custody). The ADR-007 delegation is now unconditional. Reopens the moment any non-repository backend is added.
 - ⚠️ Live traffic splitting remains out of scope by assumption, not decision.
 
 **Next Step:** Gate 6 — Dependency Map (`souschef:pre-dev-dependency-map`)

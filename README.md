@@ -90,22 +90,26 @@ groups two different prompts as one and quietly corrupts every comparison.
 | Wheel | `py3-none-any` — one artefact, every platform, no compiler |
 | First value | a scripted walkthrough of QUICKSTART.md, timed in CI |
 
-## What is not built yet
+## Custody is your repository, and only your repository
 
-**T-025 version-controlled custody — dropped, not deferred.** Fragments live
-in the repository of the project that consumes them, so that project's own
-git already versions them. `FsCustody` reads its working tree; `git log`,
-`git blame`, and pull-request review work on fragments because a fragment is
-one file. A versioned custody adapter inside this library would reimplement
-what the host repository already does better — which is exactly what
-amendment 7 delegated away.
+Fragments live in the repository of the project that uses them. That is the
+whole custody story, and it is a decision rather than a missing feature.
 
-**T-026 remote custody** — ⚠️ still **blocked on a product decision, not on
-engineering.** Leaving the host repository is what forfeits review: a
-fragment in an object store has no diff, no blame, and no pull request. The
-TRD stated two remedies and deliberately chose neither. Dropping T-025
-sharpens the question rather than answering it, because local custody is now
-the *only* place review comes from.
+Two planned adapters were removed to make it true. **Version-controlled
+custody** was dropped: your git already versions the fragments, and because a
+fragment is one file, `git log`, `git blame`, and pull-request review already
+work per fragment — an adapter here would reimplement what your repository
+does better. **Remote custody** is deferred: there is nothing outside the
+repository.
+
+The payoff is that the architecture's one recorded gap closes. The TRD flagged
+that delegating review to version control (ADR-007) holds *only* while
+fragments are version-controlled, and left the remedy unchosen. With your
+repository as the only custody, the delegation holds unconditionally — the gap
+was resolved by removing the case rather than by patching around it.
+
+Adding any backend outside your repository reopens it, and forfeits review
+entirely rather than trading one option for another.
 
 ## How this was built
 

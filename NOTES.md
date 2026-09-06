@@ -82,3 +82,20 @@ travada, não menos. Antes eu podia dizer "a custódia versionada é
 pré-requisito do review". Agora a única fonte de review é o repositório do
 projeto — então tirar o fragmento de lá não perde uma opção entre duas, perde
 o review inteiro. A pergunta de produto continua aberta e ficou mais afiada.
+
+E sem custódia remota também, por ora.
+
+Isso não é só menos escopo — fecha o único buraco que o TRD tinha anotado. A
+delegação do review pro version control (ADR-007) valia *enquanto* o fragmento
+estivesse versionado; o TRD registrou duas saídas possíveis pro caso remoto e
+não escolheu nenhuma. Agora não precisa escolher: não existe o caso. Custódia
+é o repositório do projeto, e só ele.
+
+Resolver removendo o caso é melhor do que resolver remendando. A pergunta que
+sobra fica anotada pra quem um dia reviver o remoto: é *distribuição* de uma
+biblioteca já revisada (read-only, o buraco continua fechado) ou é *edição*
+fora do repositório (aí perde o review inteiro)? São coisas diferentes e a
+segunda obrigaria a construir o que o amendment 7 mandou não construir.
+
+`Custody.versions()` fica no port, mas agora é uma costura reservada, não uma
+promessa. Nenhum backend atual tem mais de uma resposta.

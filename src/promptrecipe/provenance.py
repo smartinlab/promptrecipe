@@ -48,6 +48,27 @@ class Attestation:
     subject: str
     """Digest of the assembled output."""
 
+    recipe_path: str = ""
+    """Which recipe was assembled. Needed to reproduce; nothing else names it."""
+
+    recipe_identity: str = ""
+    """The recipe's own content identity.
+
+    In the structural form because the recipe carries PROSE, and prose is part
+    of the prompt. Without it, two different recipes loading the same
+    fragments in the same order collided on one structural identity — the same
+    silent-collision class as an order-blind identity, and just as corrosive
+    to comparison.
+    """
+
+    control_bindings: list[tuple[str, object]] = field(default_factory=list)
+    """Control variables as supplied.
+
+    Recorded for REPRODUCTION, not for identity: their structural effect is
+    already captured by condition_outcomes, so two different control values
+    that produce the same outcomes are the same structure.
+    """
+
     resolved_dependencies: list[ResolvedDependency] = field(default_factory=list)
     """Every fragment consumed, in assembly ORDER. Ordered, never a set (SD13)."""
 
@@ -78,6 +99,9 @@ class Attestation:
     def from_json(cls, data: dict) -> Attestation:
         return cls(
             subject=data["subject"],
+            recipe_path=data.get("recipe_path", ""),
+            recipe_identity=data.get("recipe_identity", ""),
+            control_bindings=[tuple(x) for x in data.get("control_bindings", [])],
             resolved_dependencies=[ResolvedDependency(**d) for d in data["resolved_dependencies"]],
             condition_outcomes=[tuple(x) for x in data["condition_outcomes"]],
             resolved_order=list(data["resolved_order"]),
@@ -119,7 +143,7 @@ def canonical_structural_form(a: Attestation) -> str:
     incidental. Getting that distinction backwards is the easiest way to
     corrupt every comparison the product will ever produce.
     """
-    lines: list[str] = ["deps"]
+    lines: list[str] = ["recipe", f"{_esc(a.recipe_path)}\t{_esc(a.recipe_identity)}", "deps"]
     # NOT sorted: assembly order is meaningful.
     lines += [f"{_esc(d.path)}\t{_esc(d.identity)}" for d in a.resolved_dependencies]
 

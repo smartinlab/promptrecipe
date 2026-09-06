@@ -86,6 +86,9 @@ CONSUMPTION_SURFACE = {
 TOOLING_SURFACE = {
     "DecompositionResult",
     "LibraryConfig",
+    "binds_to",
+    "drift",
+    "reproduce",
     "load_config",
     "resolver_from_config",
     "FragmentId",

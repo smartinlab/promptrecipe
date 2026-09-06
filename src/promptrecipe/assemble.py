@@ -377,7 +377,13 @@ def _apply_order(
     return reordered
 
 
-def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
+def assemble(
+    recipe: Recipe,
+    params: Params,
+    resolver: Resolver,
+    recipe_path: str = "",
+    recipe_identity: str = "",
+) -> Assembled:
     """Assemble a recipe. Pure over what the resolver returns."""
     # --- 1. expectations, before any content exists (TRD §7) ---------------
     for expectation in recipe.expectations:
@@ -479,6 +485,9 @@ def assemble(recipe: Recipe, params: Params, resolver: Resolver) -> Assembled:
     # reconstructed after the fact when inputs may have changed (SD5).
     attestation = Attestation(
         subject=FragmentId.of(text.encode("utf-8")).hex,
+        recipe_path=recipe_path,
+        recipe_identity=recipe_identity,
+        control_bindings=sorted(params.controls.items()),
         resolved_dependencies=[
             ResolvedDependency(path=path, identity=fid.hex) for path, fid in fragments
         ],

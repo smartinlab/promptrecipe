@@ -13,13 +13,13 @@ resolver = resolver_from_config("promptrecipe.toml")
 result = promptrecipe.get_prompt(
     "core/agent.claude",
     Params(
-        controls={"tier": "enterprise", "language": "pt-br"},   # decide STRUCTURE
-        values={"product": "Acme Cloud"},                       # fill CONTENT
+        controls={"tier": "enterprise", "language": "pt-br"},  # decide STRUCTURE
+        values={"product": "Acme Cloud"},  # fill CONTENT
     ),
     resolver,
 )
 
-agent = Agent(system_prompt=result.text)   # the caller never sees a fragment
+agent = Agent(system_prompt=result.text)  # the caller never sees a fragment
 ```
 
 **Status:** phases 1 and 2 complete, plus both integrations. 286 tests.

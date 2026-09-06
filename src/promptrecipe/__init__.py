@@ -18,6 +18,7 @@ from promptrecipe.identity import FragmentId
 from promptrecipe.parser.parse import parse
 from promptrecipe.paths import FragmentPath
 from promptrecipe.provenance import PRODUCER_VERSION
+from promptrecipe.reproduce import binds_to, drift, reproduce
 from promptrecipe.resolve import Resolver
 
 # One source of truth: the attestation's producer version and the package
@@ -34,7 +35,10 @@ __all__ = [
     "PromptRecipeError",
     "Resolver",
     "get_prompt",
+    "binds_to",
+    "drift",
     "load_config",
+    "reproduce",
     "resolver_from_config",
     "verify_decomposition",
 ]
@@ -49,7 +53,13 @@ def get_prompt(recipe_path: str, params: Params, resolver: Resolver) -> Assemble
     """
     path = FragmentPath.parse(recipe_path)
     source = resolver.read(path)
-    return assemble(parse(source.text), params, resolver)
+    return assemble(
+        parse(source.text),
+        params,
+        resolver,
+        recipe_path=str(path),
+        recipe_identity=source.id.hex,
+    )
 
 
 @dataclass(frozen=True, slots=True)

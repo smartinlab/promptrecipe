@@ -22,9 +22,55 @@ result = promptrecipe.get_prompt(
 agent = Agent(system_prompt=result.text)  # the caller never sees a fragment
 ```
 
-**Status:** phases 1 and 2 complete, plus both integrations. 286 tests.
+**Status:** phases 1 through 3 complete, plus both integrations. 332 tests.
 Python 3.11+, **one runtime dependency**, pure-Python wheel.
 Start at [QUICKSTART.md](QUICKSTART.md).
+
+## Install
+
+Not on PyPI. Install it from this repository, **pinned to a tag**:
+
+```bash
+pip install "git+https://github.com/smartinlab/promptrecipe.git@v0.1.0"
+```
+
+Pin a tag, never a branch. A library whose entire purpose is reproducible
+prompts should not be the one moving thing in your build — `@main` means two
+installs a week apart can assemble different text from the same fragments.
+
+In a `pyproject.toml`:
+
+```toml
+dependencies = [
+  "promptrecipe @ git+https://github.com/smartinlab/promptrecipe.git@v0.1.0",
+]
+```
+
+In a `requirements.txt`:
+
+```
+promptrecipe @ git+https://github.com/smartinlab/promptrecipe.git@v0.1.0
+```
+
+The optimization adapter is an extra, because nothing in the core imports it:
+
+```bash
+pip install "promptrecipe[optimization] @ git+https://github.com/smartinlab/promptrecipe.git@v0.1.0"
+```
+
+The evaluation adapter needs no extra — promptfoo is a Node tool that calls
+into Python, so there is nothing to install on this side.
+
+**The repository is private**, so pip needs credentials git can use. Either
+works:
+
+| | |
+|---|---|
+| SSH | swap the URL for `git+ssh://git@github.com/smartinlab/promptrecipe.git@v0.1.0` |
+| HTTPS | any git credential helper — `gh auth login` sets one up, and pip's `git clone` picks it up |
+
+Releases are tagged `vMAJOR.MINOR.PATCH`; `git ls-remote --tags origin` lists
+what exists.
 
 ## What it does
 

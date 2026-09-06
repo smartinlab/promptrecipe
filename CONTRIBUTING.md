@@ -60,6 +60,11 @@ Comments should explain **why**, not narrate what the line does. If a comment
 would only restate the code, leave it out; if a decision would surprise the
 next reader, write it down.
 
+## Licence
+
+Contributions are accepted under the [MIT licence](LICENSE), the same terms
+the project ships under.
+
 ## Reporting a bug
 
 The most useful report contains the recipe, the fragments, the params, and

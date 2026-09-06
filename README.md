@@ -163,9 +163,7 @@ entirely rather than trading one option for another.
 
 ## Licence
 
-Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at
-your option — MIT is short and permissive, Apache-2.0 adds the explicit patent
-grant some organisations require.
+[MIT](LICENSE).
 
 Contributions are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) lists the four
 properties that must never regress and the decisions that are settled, so you

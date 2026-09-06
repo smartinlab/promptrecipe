@@ -6,7 +6,7 @@
 
 **Prerequisites**
 ```bash
-cd /Users/michael.martim/fontes/promptrecipe && . .venv/bin/activate && python examples/01_first_prompt.py
+cd ~/promptrecipe && . .venv/bin/activate && python examples/01_first_prompt.py
 # Expected: prints the assembled prompt
 ```
 

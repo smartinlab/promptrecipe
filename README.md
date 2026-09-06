@@ -61,16 +61,8 @@ pip install "promptrecipe[optimization] @ git+https://github.com/smartinlab/prom
 The evaluation adapter needs no extra — promptfoo is a Node tool that calls
 into Python, so there is nothing to install on this side.
 
-**The repository is private**, so pip needs credentials git can use. Either
-works:
-
-| | |
-|---|---|
-| SSH | swap the URL for `git+ssh://git@github.com/smartinlab/promptrecipe.git@v0.1.0` |
-| HTTPS | any git credential helper — `gh auth login` sets one up, and pip's `git clone` picks it up |
-
-Releases are tagged `vMAJOR.MINOR.PATCH`; `git ls-remote --tags origin` lists
-what exists.
+Releases are tagged `vMAJOR.MINOR.PATCH`. `git ls-remote --tags
+https://github.com/smartinlab/promptrecipe.git` lists what exists.
 
 ## What it does
 
@@ -168,6 +160,17 @@ was resolved by removing the case rather than by patching around it.
 
 Adding any backend outside your repository reopens it, and forfeits review
 entirely rather than trading one option for another.
+
+## Licence
+
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at
+your option — MIT is short and permissive, Apache-2.0 adds the explicit patent
+grant some organisations require.
+
+Contributions are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) lists the four
+properties that must never regress and the decisions that are settled, so you
+can tell before writing code whether a change fits. Security reports go
+through [SECURITY.md](SECURITY.md), not a public issue.
 
 ## How this was built
 

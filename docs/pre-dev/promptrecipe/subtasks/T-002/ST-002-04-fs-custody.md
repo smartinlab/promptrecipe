@@ -6,7 +6,7 @@
 
 **Prerequisites**
 ```bash
-cd /Users/michael.martim/fontes/promptrecipe && . .venv/bin/activate && pytest
+cd ~/promptrecipe && . .venv/bin/activate && pytest
 # Expected: 25 passed
 ```
 

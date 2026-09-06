@@ -6,8 +6,8 @@
 
 **Prerequisites**
 ```bash
-cd /Users/michael.martim/fontes/promptrecipe && pwd
-# Expected: /Users/michael.martim/fontes/promptrecipe
+cd ~/promptrecipe && pwd
+# Expected: ~/promptrecipe
 python3 --version
 # Expected: Python 3.11 or newer
 ```
@@ -21,11 +21,11 @@ python3 --version
 ADR-007 delegates review, history, and origin to version control. That delegation is void until this exists.
 
 ```bash
-cd /Users/michael.martim/fontes/promptrecipe
+cd ~/promptrecipe
 git init
 git branch -M main
 ```
-Expected: `Initialized empty Git repository in /Users/michael.martim/fontes/promptrecipe/.git/`
+Expected: `Initialized empty Git repository in ~/promptrecipe/.git/`
 
 ### Step 2 — Create `.gitignore` (1 min)
 

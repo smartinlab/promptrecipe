@@ -6,7 +6,7 @@
 
 **Prerequisites**
 ```bash
-cd /Users/michael.martim/fontes/promptrecipe && . .venv/bin/activate
+cd ~/promptrecipe && . .venv/bin/activate
 python scripts/check_supply_chain.py && pytest
 # Expected: PASS ...; 3 passed
 ```

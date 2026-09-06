@@ -15,6 +15,7 @@ from promptrecipe.assemble import Assembled, Params, assemble
 from promptrecipe.config import LibraryConfig, load_config, resolver_from_config
 from promptrecipe.errors import PromptRecipeError
 from promptrecipe.identity import FragmentId
+from promptrecipe.impact import dependents, preview_change
 from promptrecipe.parser.parse import parse
 from promptrecipe.paths import FragmentPath
 from promptrecipe.provenance import PRODUCER_VERSION
@@ -36,8 +37,10 @@ __all__ = [
     "Resolver",
     "get_prompt",
     "binds_to",
+    "dependents",
     "drift",
     "load_config",
+    "preview_change",
     "reproduce",
     "resolver_from_config",
     "verify_decomposition",

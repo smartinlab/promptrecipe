@@ -87,6 +87,8 @@ TOOLING_SURFACE = {
     "DecompositionResult",
     "LibraryConfig",
     "binds_to",
+    "dependents",
+    "preview_change",
     "drift",
     "reproduce",
     "load_config",

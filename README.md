@@ -35,6 +35,9 @@ Start at [QUICKSTART.md](QUICKSTART.md).
 | **Condition, order, select** | `[if model == "claude"][load core/tone.claude]`, `[order: role, tone, safety]`. Ordering and version selection reuse the same condition mechanism — there is no second subsystem. |
 | **Attribute every result** | Two identities per assembly: **structural** (group A/B by this) and **instance** (reproduce exact text from this). One digest cannot serve both. |
 | **Fail loudly** | An ambiguous reference, a cycle, a missing binding, a violated expectation — all errors, never a silent pick. |
+| **Point at the culprit** | A span map says which fragment produced which portion of the output — the file to open, not eleven candidates. |
+| **Know the blast radius** | `dependents()` lists everything a fragment reaches, **assembling nothing**. `preview_change()` then shows the diff each one would take. |
+| **Reproduce** | An assembly rebuilds byte-identically from its record alone, or reports exactly which input drifted. |
 
 ## A library on disk
 
@@ -88,14 +91,6 @@ groups two different prompts as one and quietly corrupts every comparison.
 | First value | a scripted walkthrough of QUICKSTART.md, timed in CI |
 
 ## What is not built yet
-
-Phase 3 — the trust layer, and the highest-opportunity job in the plan:
-
-- **T-018** reproduce an assembly byte-identically from its record
-- **T-019** span map: which fragment produced which portion of the output
-- **T-020** bind an external result to exactly one assembly
-- **T-021** list every recipe depending on a fragment, **without assembling**
-- **T-022** preview a change's effect on each dependent
 
 Phase 4 — custody:
 

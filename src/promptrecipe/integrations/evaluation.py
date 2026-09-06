@@ -82,7 +82,8 @@ def fragment_prompt_function(fragment_path: str, resolver: Resolver) -> Callable
 
         variables = (context or {}).get("vars", {})
         params = params_from_vars(variables)
-        return _substitute(resolver.read(path).text, params.values)
+        text, _edits = _substitute(resolver.read(path).text, params.values)
+        return text
 
     return render
 

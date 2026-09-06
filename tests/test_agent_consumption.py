@@ -95,6 +95,8 @@ TOOLING_SURFACE = {
     "resolver_from_config",
     "FragmentId",
     "FragmentPath",
+    "Span",
+    "SpanMap",
     "verify_decomposition",
 }
 

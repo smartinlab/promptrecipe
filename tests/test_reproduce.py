@@ -113,7 +113,11 @@ def test_a_library_change_that_alters_output_is_reported_as_a_mismatch(monkeypat
 
     module = importlib.import_module("promptrecipe.assemble")
     real = module._substitute
-    monkeypatch.setattr(module, "_substitute", lambda text, values: real(text, values) + " DRIFT")
+    def drifted(text, values):
+        substituted, edits = real(text, values)
+        return substituted + " DRIFT", edits
+
+    monkeypatch.setattr(module, "_substitute", drifted)
 
     with pytest.raises(IdentityMismatch):
         reproduce(original.attestation, resolver)

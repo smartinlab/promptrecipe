@@ -21,12 +21,15 @@ from promptrecipe.paths import FragmentPath
 from promptrecipe.provenance import PRODUCER_VERSION
 from promptrecipe.reproduce import binds_to, drift, reproduce
 from promptrecipe.resolve import Resolver
+from promptrecipe.spans import Span, SpanMap
 
 # One source of truth: the attestation's producer version and the package
 # version cannot drift apart across a release bump.
 __version__ = PRODUCER_VERSION
 
 __all__ = [
+    "Span",
+    "SpanMap",
     "Assembled",
     "DecompositionResult",
     "LibraryConfig",

@@ -57,6 +57,7 @@ from promptrecipe.provenance import (
     structural_identity,
 )
 from promptrecipe.resolve import Resolver
+from promptrecipe.spans import Span, SpanMap, coalesce, remap
 
 Value = str | int | bool
 
@@ -103,6 +104,10 @@ class Assembled:
     """Fragments in assembly ORDER. A list, never a set — order is identity (SD13)."""
     condition_outcomes: list[tuple[str, bool]] = field(default_factory=list)
     """Every condition and its outcome, so a branch can be replayed (SD6)."""
+    spans: SpanMap = field(default_factory=SpanMap)
+    """Where each fragment landed in `text` — the lighter half of provenance
+    (FR-004). Answers "which fragment produced THIS line", which is the
+    question you have while debugging, not after."""
 
 
 def _value_of(expr: Expr, params: Params, depth: int = 0) -> Value:
@@ -226,8 +231,13 @@ def _path_for(path: PathExpr, params: Params) -> FragmentPath:
     return FragmentPath.parse(params.addresses[path.name])
 
 
-def _substitute(text: str, values: dict[str, str]) -> str:
-    """Replace `{{name}}` with its bound value.
+def _substitute(text: str, values: dict[str, str]) -> tuple[str, list[tuple[int, int, int]]]:
+    """Replace `{{name}}` with its bound value, reporting every edit.
+
+    The edits — `(start, end, new_length)` over the INPUT — are what lets the
+    span map survive this pass. Collecting them here rather than diffing
+    afterwards is the only way to know which output characters replaced which
+    input ones (FR-004).
 
     ONE pass over the input. The output is never re-scanned, so a substituted
     value containing `{{...}}` or `[load ...]` stays literal (ADR-006).
@@ -235,6 +245,7 @@ def _substitute(text: str, values: dict[str, str]) -> str:
     structure, so an unknown one is not a structural failure.
     """
     out: list[str] = []
+    edits: list[tuple[int, int, int]] = []
     i = 0
     n = len(text)
 
@@ -254,11 +265,12 @@ def _substitute(text: str, values: dict[str, str]) -> str:
             # Appended directly to the output; `i` jumps past it, so this
             # loop never re-examines the substituted text.
             out.append(values[name])
+            edits.append((start, end + 2, len(values[name])))
         else:
             out.append(text[start : end + 2])
         i = end + 2
 
-    return "".join(out)
+    return "".join(out), edits
 
 
 def _expand(
@@ -267,8 +279,12 @@ def _expand(
     resolver: Resolver,
     stack: list[str],
     seen: list[tuple[str, FragmentId]],
-) -> str:
+) -> tuple[str, list[Span]]:
     """Inline a fragment, resolving any references it makes to other fragments.
+
+    Returns the text and a partition of it: every character attributed to the
+    fragment that literally contains it, innermost wins (FR-004). Offsets are
+    relative to the returned text; the caller shifts them into place.
 
     Depth-first over an explicit stack so a cycle can be reported as the
     ACTUAL PATH that closed it — `a -> b -> c -> a` — rather than merely
@@ -280,14 +296,28 @@ def _expand(
         raise DepthLimitExceeded(limit=MAX_INCLUSION_DEPTH, path=str(path))
 
     out: list[str] = []
+    spans: list[Span] = []
+    position = 0
     cursor = 0
     text = content.text
+    mine = str(path)
+    identity = content.id.hex
+
+    def own(chunk: str) -> None:
+        nonlocal position
+        if not chunk:
+            return
+        spans.append(
+            Span(path=mine, identity=identity, start=position, end=position + len(chunk))
+        )
+        out.append(chunk)
+        position += len(chunk)
 
     references = list(REFERENCE.finditer(text))
     _reject_directives(path, text, references)
 
     for match in references:
-        out.append(text[cursor : match.start()])
+        own(text[cursor : match.start()])
         child_path = FragmentPath.parse(match.group(1))
         key = str(child_path)
 
@@ -301,13 +331,19 @@ def _expand(
         seen.append((key, child_content.id))
         stack.append(key)
         try:
-            out.append(_expand(child_path, child_content, resolver, stack, seen))
+            child_text, child_spans = _expand(child_path, child_content, resolver, stack, seen)
         finally:
             stack.pop()
+        spans.extend(
+            replace(span, start=span.start + position, end=span.end + position)
+            for span in child_spans
+        )
+        out.append(child_text)
+        position += len(child_text)
         cursor = match.end()
 
-    out.append(text[cursor:])
-    return "".join(out)
+    own(text[cursor:])
+    return "".join(out), spans
 
 
 def _reject_directives(path: FragmentPath, text: str, references: list[re.Match[str]]) -> None:
@@ -461,13 +497,26 @@ def assemble(
 
     parts: list[str] = []
     fragments: list[tuple[str, FragmentId]] = []
+    raw_spans: list[Span] = []
+    offset = 0
     for kind, payload in segments:
         if kind == "text":
+            # Prose the recipe itself wrote. Attributed to no fragment, which
+            # is the honest answer and a useful one: it tells you to open the
+            # recipe rather than hunt for a fragment that does not exist.
+            raw_spans.append(Span(path="", identity="", start=offset, end=offset + len(payload)))
             parts.append(payload)
+            offset += len(payload)
         else:
             path, content = payload
             nested: list[tuple[str, FragmentId]] = []
-            parts.append(_expand(path, content, resolver, [str(path)], nested))
+            expanded, expanded_spans = _expand(path, content, resolver, [str(path)], nested)
+            raw_spans.extend(
+                replace(span, start=span.start + offset, end=span.end + offset)
+                for span in expanded_spans
+            )
+            parts.append(expanded)
+            offset += len(expanded)
             fragments.append((str(path), content.id))
             # Nested fragments are dependencies too: provenance must name every
             # fragment that reached the output, not only the ones the recipe
@@ -479,7 +528,13 @@ def assemble(
     # Running last IS the security property (ADR-006): every structural
     # decision above is already final, so a caller-supplied value cannot
     # influence which fragments loaded, their order, or their version.
-    text = _substitute("".join(parts), params.values)
+    text, edits = _substitute("".join(parts), params.values)
+
+    # The span map is collected against the PRE-substitution text, so every
+    # offset above is stale the moment values land. Remapping through the
+    # edits that pass reported is what keeps the map true rather than roughly
+    # right (FR-004).
+    spans = SpanMap(remap(coalesce(raw_spans), edits))
 
     # --- provenance: produced HERE, as a return value, so it cannot be
     # reconstructed after the fact when inputs may have changed (SD5).
@@ -506,4 +561,5 @@ def assemble(
         attestation=attestation,
         fragments=fragments,
         condition_outcomes=condition_outcomes,
+        spans=spans,
     )
